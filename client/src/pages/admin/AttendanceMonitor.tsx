@@ -139,7 +139,8 @@ export default function AttendanceMonitor() {
               <table className="w-full">
                 <thead className="border-b bg-muted/50">
                   <tr>
-                    <th className="p-3 text-left text-sm font-medium">Employee ID</th>
+                    <th className="p-3 text-left text-sm font-medium">Employee</th>
+                    <th className="p-3 text-left text-sm font-medium">Email</th>
                     <th className="p-3 text-left text-sm font-medium">Check-In</th>
                     <th className="p-3 text-left text-sm font-medium">Check-Out</th>
                     <th className="p-3 text-left text-sm font-medium">Duration</th>
@@ -147,13 +148,14 @@ export default function AttendanceMonitor() {
                   </tr>
                 </thead>
                 <tbody>
-                  {attendanceRecords.map((record) => (
+                  {attendanceRecords.map((record: any) => (
                     <tr
                       key={record.id}
                       className="border-b last:border-0 hover-elevate"
                       data-testid={`row-attendance-${record.id}`}
                     >
-                      <td className="p-3 text-sm">{record.userId}</td>
+                      <td className="p-3 text-sm font-medium">{record.userName || `User ${record.userId}`}</td>
+                      <td className="p-3 text-sm text-muted-foreground">{record.userEmail || '-'}</td>
                       <td className="p-3 text-sm" data-testid={`checkin-${record.id}`}>
                         {formatTime(record.checkIn)}
                       </td>
