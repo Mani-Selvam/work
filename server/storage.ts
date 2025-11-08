@@ -1441,13 +1441,37 @@ export class DbStorage implements IStorage {
       .orderBy(desc(attendanceRecords.date));
   }
 
-  async getDailyAttendance(companyId: number, date: string): Promise<AttendanceRecord[]> {
-    return await db.select().from(attendanceRecords)
+  async getDailyAttendance(companyId: number, date: string): Promise<any[]> {
+    const results = await db
+      .select({
+        id: attendanceRecords.id,
+        userId: attendanceRecords.userId,
+        companyId: attendanceRecords.companyId,
+        shiftId: attendanceRecords.shiftId,
+        date: attendanceRecords.date,
+        checkIn: attendanceRecords.checkIn,
+        checkOut: attendanceRecords.checkOut,
+        workDuration: attendanceRecords.workDuration,
+        status: attendanceRecords.status,
+        gpsLocation: attendanceRecords.gpsLocation,
+        ipAddress: attendanceRecords.ipAddress,
+        deviceId: attendanceRecords.deviceId,
+        remarks: attendanceRecords.remarks,
+        createdAt: attendanceRecords.createdAt,
+        updatedAt: attendanceRecords.updatedAt,
+        userName: users.displayName,
+        userEmail: users.email,
+        userPhotoURL: users.photoURL,
+      })
+      .from(attendanceRecords)
+      .leftJoin(users, eq(attendanceRecords.userId, users.id))
       .where(and(
         eq(attendanceRecords.companyId, companyId),
         eq(attendanceRecords.date, date)
       ))
       .orderBy(attendanceRecords.userId);
+    
+    return results;
   }
 
   async getMonthlyAttendanceSummary(userId: number, month: number, year: number): Promise<{

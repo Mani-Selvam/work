@@ -2988,6 +2988,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reviewComments: true,
       }).extend({
         attendanceId: z.number().optional().nullable(),
+        requestedCheckIn: z.string().or(z.date()).optional().nullable().transform((val) => {
+          if (typeof val === 'string' && val) return new Date(val);
+          if (val instanceof Date) return val;
+          return null;
+        }),
+        requestedCheckOut: z.string().or(z.date()).optional().nullable().transform((val) => {
+          if (typeof val === 'string' && val) return new Date(val);
+          if (val instanceof Date) return val;
+          return null;
+        }),
       });
       
       const validatedBody = correctionSchema.parse(req.body);
