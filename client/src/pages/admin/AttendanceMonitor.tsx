@@ -13,7 +13,16 @@ export default function AttendanceMonitor() {
   );
 
   const { data: attendanceRecords, isLoading } = useQuery<AttendanceRecord[]>({
-    queryKey: ["/api/admin/attendance/daily", { date: selectedDate }],
+    queryKey: ["/api/admin/attendance/daily", selectedDate],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/attendance/daily?date=${selectedDate}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch attendance records');
+      }
+      return response.json();
+    },
   });
 
   const stats = {

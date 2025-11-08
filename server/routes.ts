@@ -2795,16 +2795,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     userId: z.number(),
     companyId: z.number(),
     date: z.string(),
-    checkIn: z.string().or(z.date()).optional(),
-    checkOut: z.string().or(z.date()).optional().nullable(),
+    checkIn: z.string().or(z.date()).optional().transform((val) => {
+      if (typeof val === 'string') return new Date(val);
+      return val;
+    }),
+    checkOut: z.string().or(z.date()).optional().nullable().transform((val) => {
+      if (val === null || val === undefined) return null;
+      if (typeof val === 'string') return new Date(val);
+      return val;
+    }),
     status: z.enum(['present', 'absent', 'late', 'leave']),
     workDuration: z.number().optional().nullable(),
     gpsLocation: z.string().nullable().optional(),
   });
 
   const updateAttendanceSchema = z.object({
-    checkIn: z.string().or(z.date()).optional(),
-    checkOut: z.string().or(z.date()).optional().nullable(),
+    checkIn: z.string().or(z.date()).optional().transform((val) => {
+      if (typeof val === 'string') return new Date(val);
+      return val;
+    }),
+    checkOut: z.string().or(z.date()).optional().nullable().transform((val) => {
+      if (val === null || val === undefined) return null;
+      if (typeof val === 'string') return new Date(val);
+      return val;
+    }),
     status: z.enum(['present', 'absent', 'late', 'leave']).optional(),
     workDuration: z.number().optional().nullable(),
     remarks: z.string().optional().nullable(),
@@ -2969,6 +2983,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const correctionSchema = insertCorrectionRequestSchema.omit({
         userId: true,
         companyId: true,
+        status: true,
+        reviewedBy: true,
+        reviewComments: true,
+      }).extend({
+        attendanceId: z.number().optional().nullable(),
       });
       
       const validatedBody = correctionSchema.parse(req.body);
