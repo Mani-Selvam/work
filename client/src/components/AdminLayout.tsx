@@ -18,7 +18,10 @@ import {
   DollarSign,
   Activity,
   Receipt,
-  Calendar
+  Calendar,
+  Clock,
+  TrendingUp,
+  Settings
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import BottomNav, { BottomNavItem } from "./BottomNav";
@@ -42,6 +45,11 @@ const navItems: NavItem[] = [
   { path: "/admin/messages", label: "Messages", icon: MessageSquare },
   { path: "/admin/ratings", label: "Ratings", icon: Star },
   { path: "/admin/feedback", label: "Feedback", icon: MessageCircle },
+  { path: "/admin/leaves", label: "Leave Approval", icon: Calendar },
+  { path: "/admin/attendance", label: "Attendance Monitor", icon: Clock },
+  { path: "/admin/attendance-reports", label: "Attendance Reports", icon: TrendingUp },
+  { path: "/admin/attendance-policy", label: "Attendance Policy", icon: Settings },
+  { path: "/admin/holidays", label: "Holiday Management", icon: Calendar },
 ];
 
 const superAdminNavItems: NavItem[] = [

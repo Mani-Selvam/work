@@ -14,7 +14,10 @@ import {
   Star,
   LogOut,
   Menu,
-  Calendar
+  Calendar,
+  Clock,
+  History,
+  FileEdit
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import BottomNav, { BottomNavItem } from "./BottomNav";
@@ -35,6 +38,10 @@ const navItems: NavItem[] = [
   { path: "/user/tasks", label: "Assigned Tasks", icon: ListTodo },
   { path: "/user/report-view", label: "View Reports", icon: Eye },
   { path: "/user/ratings", label: "Ratings", icon: Star },
+  { path: "/user/leaves", label: "Leave Management", icon: Calendar },
+  { path: "/user/attendance", label: "Attendance", icon: Clock },
+  { path: "/user/attendance-history", label: "Attendance History", icon: History },
+  { path: "/user/correction-requests", label: "Correction Requests", icon: FileEdit },
 ];
 
 const bottomNavItems: BottomNavItem[] = [

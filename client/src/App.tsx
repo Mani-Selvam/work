@@ -24,9 +24,13 @@ import ReportView from "@/pages/user/ReportView";
 import Ratings from "@/pages/user/Ratings";
 import LeaveManagement from "@/pages/user/LeaveManagement";
 import Attendance from "@/pages/user/Attendance";
+import AttendanceHistory from "@/pages/user/AttendanceHistory";
+import CorrectionRequests from "@/pages/user/CorrectionRequests";
 import Dashboard from "@/pages/admin/Dashboard";
 import LeaveApproval from "@/pages/admin/LeaveApproval";
 import AttendanceMonitor from "@/pages/admin/AttendanceMonitor";
+import AttendanceReports from "@/pages/admin/AttendanceReports";
+import AttendancePolicy from "@/pages/admin/AttendancePolicy";
 import HolidayManagement from "@/pages/admin/HolidayManagement";
 import Users from "@/pages/admin/Users";
 import AdminReports from "@/pages/admin/AdminReports";
@@ -129,6 +133,12 @@ function Router() {
       <Route path="/user/attendance">
         {() => <ProtectedRoute component={() => <UserLayout><Attendance /></UserLayout>} allowedRole="user" />}
       </Route>
+      <Route path="/user/attendance-history">
+        {() => <ProtectedRoute component={() => <UserLayout><AttendanceHistory /></UserLayout>} allowedRole="user" />}
+      </Route>
+      <Route path="/user/correction-requests">
+        {() => <ProtectedRoute component={() => <UserLayout><CorrectionRequests /></UserLayout>} allowedRole="user" />}
+      </Route>
       <Route path="/user">
         <Redirect to="/user/overview" />
       </Route>
@@ -140,6 +150,12 @@ function Router() {
       </Route>
       <Route path="/admin/attendance">
         {() => <ProtectedRoute component={() => <AdminLayout><AttendanceMonitor /></AdminLayout>} allowedRole="admin" />}
+      </Route>
+      <Route path="/admin/attendance-reports">
+        {() => <ProtectedRoute component={() => <AdminLayout><AttendanceReports /></AdminLayout>} allowedRole="admin" />}
+      </Route>
+      <Route path="/admin/attendance-policy">
+        {() => <ProtectedRoute component={() => <AdminLayout><AttendancePolicy /></AdminLayout>} allowedRole="admin" />}
       </Route>
       <Route path="/admin/holidays">
         {() => <ProtectedRoute component={() => <AdminLayout><HolidayManagement /></AdminLayout>} allowedRole="admin" />}
