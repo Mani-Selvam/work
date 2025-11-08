@@ -23,7 +23,7 @@ export default function EmailVerification() {
       }
 
       try {
-        const res = await apiRequest("GET", `/api/auth/verify-company?token=${token}`);
+        const res = await apiRequest(`/api/auth/verify-company?token=${token}`, "GET");
         const response = await res.json();
         setStatus("success");
         setMessage(response.message);

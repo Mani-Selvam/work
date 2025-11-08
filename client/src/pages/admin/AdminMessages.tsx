@@ -40,7 +40,7 @@ export default function AdminMessages() {
 
   const sendPrivateMessageMutation = useMutation({
     mutationFn: async (messageData: typeof privateMessageForm) => {
-      return await apiRequest('POST', '/api/messages', {
+      return await apiRequest('/api/messages', 'POST', {
         senderId: dbUserId,
         receiverId: parseInt(messageData.receiverId),
         message: messageData.message,
@@ -65,7 +65,7 @@ export default function AdminMessages() {
 
   const sendGroupMessageMutation = useMutation({
     mutationFn: async (messageData: typeof groupMessageForm) => {
-      return await apiRequest('POST', '/api/group-messages', {
+      return await apiRequest('/api/group-messages', 'POST', {
         title: messageData.title || null,
         message: messageData.message,
       });

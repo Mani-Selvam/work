@@ -44,7 +44,7 @@ export default function LeaveManagement() {
 
   const createLeaveMutation = useMutation({
     mutationFn: async (data: LeaveFormData) => {
-      return await apiRequest('POST', '/api/leaves', data);
+      return await apiRequest('/api/leaves', 'POST', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leaves/me'] });

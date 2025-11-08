@@ -91,7 +91,7 @@ export default function CompanyRegistration() {
     try {
       setIsLoading(true);
       
-      const res = await apiRequest("POST", "/api/auth/register-company-basic", data);
+      const res = await apiRequest("/api/auth/register-company-basic", "POST", data);
       const response = await res.json();
 
       setServerIdInfo({ serverId: response.serverId, email: response.email });

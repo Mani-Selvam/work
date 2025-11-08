@@ -14,7 +14,7 @@ export default function Feedback() {
 
   const submitFeedbackMutation = useMutation({
     mutationFn: async (message: string) => {
-      return await apiRequest('POST', '/api/feedbacks', {
+      return await apiRequest('/api/feedbacks', 'POST', {
         userId: dbUserId,
         message,
       });

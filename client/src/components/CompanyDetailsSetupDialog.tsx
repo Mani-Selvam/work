@@ -84,7 +84,7 @@ export default function CompanyDetailsSetupDialog({
   const handleStep1Submit = async (data: Step1Data) => {
     try {
       setIsSubmitting(true);
-      await apiRequest("PATCH", `/api/companies/${companyId}`, data);
+      await apiRequest(`/api/companies/${companyId}`, "PATCH", data);
       setCurrentStep(2);
     } catch (error: any) {
       toast({
@@ -100,7 +100,7 @@ export default function CompanyDetailsSetupDialog({
   const handleStep2Submit = async (data: Step2Data) => {
     try {
       setIsSubmitting(true);
-      await apiRequest("PATCH", `/api/companies/${companyId}`, data);
+      await apiRequest(`/api/companies/${companyId}`, "PATCH", data);
       setCurrentStep(3);
     } catch (error: any) {
       toast({
@@ -122,7 +122,7 @@ export default function CompanyDetailsSetupDialog({
         yearEstablished: parseInt(data.yearEstablished),
       };
       
-      await apiRequest("PATCH", `/api/companies/${companyId}`, payload);
+      await apiRequest(`/api/companies/${companyId}`, "PATCH", payload);
       
       await queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId] });
       

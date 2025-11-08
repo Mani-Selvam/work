@@ -74,7 +74,7 @@ export default function Dashboard() {
 
   const updatePricingMutation = useMutation({
     mutationFn: async (data: { slotType: string; pricePerSlot: number; currency: string }) => {
-      return await apiRequest('POST', '/api/slot-pricing', data);
+      return await apiRequest('/api/slot-pricing', 'POST', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/slot-pricing'] });
@@ -88,7 +88,7 @@ export default function Dashboard() {
 
   const deleteCompanyMutation = useMutation({
     mutationFn: async (companyId: number) => {
-      return await apiRequest('DELETE', `/api/companies/${companyId}`);
+      return await apiRequest(`/api/companies/${companyId}`, 'DELETE');
     },
     onMutate: async (companyId: number) => {
       await queryClient.cancelQueries({ queryKey: ['/api/companies'] });

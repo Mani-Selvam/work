@@ -22,7 +22,7 @@ export default function LeaveApproval() {
 
   const approveMutation = useMutation({
     mutationFn: async (leaveId: number) => {
-      return await apiRequest('PATCH', `/api/leaves/${leaveId}/approve`, {});
+      return await apiRequest(`/api/leaves/${leaveId}/approve`, 'PATCH', {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leaves/company', user?.companyId] });
@@ -42,7 +42,7 @@ export default function LeaveApproval() {
 
   const rejectMutation = useMutation({
     mutationFn: async (leaveId: number) => {
-      return await apiRequest('PATCH', `/api/leaves/${leaveId}/reject`, {});
+      return await apiRequest(`/api/leaves/${leaveId}/reject`, 'PATCH', {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leaves/company', user?.companyId] });

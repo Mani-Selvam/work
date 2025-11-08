@@ -95,7 +95,7 @@ export default function SuperAdminDashboard() {
 
   const suspendMutation = useMutation({
     mutationFn: (companyId: number) =>
-      apiRequest("POST", `/api/super-admin/companies/${companyId}/suspend`),
+      apiRequest(`/api/super-admin/companies/${companyId}/suspend`, "POST"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/super-admin/companies-with-stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/super-admin/analytics'] });
@@ -115,7 +115,7 @@ export default function SuperAdminDashboard() {
 
   const reactivateMutation = useMutation({
     mutationFn: (companyId: number) =>
-      apiRequest("POST", `/api/super-admin/companies/${companyId}/reactivate`),
+      apiRequest(`/api/super-admin/companies/${companyId}/reactivate`, "POST"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/super-admin/companies-with-stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/super-admin/analytics'] });
@@ -135,7 +135,7 @@ export default function SuperAdminDashboard() {
 
   const deleteMutation = useMutation({
     mutationFn: (companyId: number) =>
-      apiRequest("DELETE", `/api/companies/${companyId}`),
+      apiRequest(`/api/companies/${companyId}`, "DELETE"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/super-admin/companies-with-stats'] });
       queryClient.invalidateQueries({ queryKey: ['/api/super-admin/analytics'] });

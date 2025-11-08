@@ -73,7 +73,7 @@ export default function Users() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: number) => {
-      return await apiRequest('DELETE', `/api/users/${userId}`);
+      return await apiRequest(`/api/users/${userId}`, 'DELETE');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users?includeDeleted=true'] });
@@ -94,7 +94,7 @@ export default function Users() {
 
   const createRatingMutation = useMutation({
     mutationFn: async (ratingData: typeof ratingForm) => {
-      return await apiRequest('POST', '/api/ratings', {
+      return await apiRequest('/api/ratings', 'POST', {
         userId: parseInt(ratingData.userId),
         rating: ratingData.rating,
         feedback: ratingData.feedback || null,
@@ -120,7 +120,7 @@ export default function Users() {
 
   const createUserMutation = useMutation({
     mutationFn: async (userData: typeof userForm) => {
-      const response = await apiRequest('POST', '/api/users', userData);
+      const response = await apiRequest('/api/users', 'POST', userData);
       return await response.json() as User;
     },
     onSuccess: (data: User) => {

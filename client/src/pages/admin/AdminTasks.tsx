@@ -52,7 +52,7 @@ export default function AdminTasks() {
         deadline: taskData.deadline ? new Date(taskData.deadline).toISOString() : null,
         status: "pending",
       };
-      return await apiRequest('POST', '/api/tasks', payload);
+      return await apiRequest('/api/tasks', 'POST', payload);
     },
     onSuccess: () => {
       toast({

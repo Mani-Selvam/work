@@ -52,7 +52,7 @@ export default function CompanyManagement() {
 
   const updateCompanyMutation = useMutation({
     mutationFn: async (updates: { name?: string; maxAdmins?: number; maxMembers?: number }) => {
-      return await apiRequest('PATCH', '/api/my-company', updates);
+      return await apiRequest('/api/my-company', 'PATCH', updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/my-company'] });
@@ -74,7 +74,7 @@ export default function CompanyManagement() {
   const createPaymentIntentMutation = useMutation({
     mutationFn: async (data: { slotType: 'admin' | 'member'; quantity: number }) => {
       setPaymentStatus('creating');
-      const response = await apiRequest('POST', '/api/create-payment-intent', data);
+      const response = await apiRequest('/api/create-payment-intent', 'POST', data);
       return await response.json();
     },
     onSuccess: (data: any) => {
@@ -101,7 +101,7 @@ export default function CompanyManagement() {
 
   const verifyPaymentMutation = useMutation({
     mutationFn: async (paymentIntentId: string) => {
-      const response = await apiRequest('POST', '/api/verify-payment', { paymentIntentId, paymentId });
+      const response = await apiRequest('/api/verify-payment', 'POST', { paymentIntentId, paymentId });
       return await response.json();
     },
     onSuccess: (data: any) => {

@@ -161,7 +161,7 @@ export default function CompanyProfile() {
         employees: parseInt(data.employees),
         yearEstablished: parseInt(data.yearEstablished),
       };
-      return await apiRequest('PATCH', '/api/my-company/profile', payload);
+      return await apiRequest('/api/my-company/profile', 'PATCH', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/my-company/profile'] });

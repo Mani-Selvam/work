@@ -41,7 +41,7 @@ export default function TimeBasedForm({
                 notes: data.notes || null,
             };
 
-            return await apiRequest("POST", "/api/reports", reportData);
+            return await apiRequest("/api/reports", "POST", reportData);
         },
         onSuccess: () => {
             toast({

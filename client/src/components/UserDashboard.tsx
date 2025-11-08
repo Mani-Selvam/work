@@ -96,7 +96,7 @@ export default function UserDashboard() {
 
   const markAsReadMutation = useMutation({
     mutationFn: async (messageId: number) => {
-      return await apiRequest('PATCH', `/api/messages/${messageId}/read`, {});
+      return await apiRequest(`/api/messages/${messageId}/read`, 'PATCH', {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/messages', dbUserId] });
@@ -105,7 +105,7 @@ export default function UserDashboard() {
 
   const updateTaskStatusMutation = useMutation({
     mutationFn: async ({ taskId, status }: { taskId: number; status: string }) => {
-      return await apiRequest('PATCH', `/api/tasks/${taskId}/status`, { status });
+      return await apiRequest(`/api/tasks/${taskId}/status`, 'PATCH', { status });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['/api/tasks', dbUserId] });

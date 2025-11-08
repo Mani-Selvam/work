@@ -122,7 +122,7 @@ export default function AdminDashboard() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: number) => {
-      return await apiRequest('DELETE', `/api/users/${userId}`);
+      return await apiRequest(`/api/users/${userId}`, 'DELETE');
     },
     onSuccess: () => {
       toast({
@@ -141,7 +141,7 @@ export default function AdminDashboard() {
 
   const sendPrivateMessageMutation = useMutation({
     mutationFn: async (messageData: typeof privateMessageForm) => {
-      return await apiRequest('POST', '/api/messages', {
+      return await apiRequest('/api/messages', 'POST', {
         senderId: dbUserId,
         receiverId: parseInt(messageData.receiverId),
         message: messageData.message,
@@ -166,7 +166,7 @@ export default function AdminDashboard() {
 
   const sendGroupMessageMutation = useMutation({
     mutationFn: async (messageData: typeof groupMessageForm) => {
-      return await apiRequest('POST', '/api/group-messages', {
+      return await apiRequest('/api/group-messages', 'POST', {
         title: messageData.title || null,
         message: messageData.message,
       });
@@ -189,7 +189,7 @@ export default function AdminDashboard() {
 
   const createRatingMutation = useMutation({
     mutationFn: async (ratingData: typeof ratingForm) => {
-      return await apiRequest('POST', '/api/ratings', {
+      return await apiRequest('/api/ratings', 'POST', {
         userId: parseInt(ratingData.userId),
         rating: ratingData.rating,
         feedback: ratingData.feedback || null,
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
         deadline: taskData.deadline ? new Date(taskData.deadline).toISOString() : null,
         status: "pending",
       };
-      return await apiRequest('POST', '/api/tasks', payload);
+      return await apiRequest('/api/tasks', 'POST', payload);
     },
     onSuccess: () => {
       toast({

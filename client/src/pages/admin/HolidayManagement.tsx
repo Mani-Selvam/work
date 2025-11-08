@@ -46,7 +46,7 @@ export default function HolidayManagement() {
 
   const createHolidayMutation = useMutation({
     mutationFn: async (data: HolidayFormData) => {
-      return await apiRequest('POST', '/api/holidays', data);
+      return await apiRequest('/api/holidays', 'POST', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/holidays/company', user?.companyId] });
@@ -68,7 +68,7 @@ export default function HolidayManagement() {
 
   const deleteHolidayMutation = useMutation({
     mutationFn: async (holidayId: number) => {
-      return await apiRequest('DELETE', `/api/holidays/${holidayId}`, {});
+      return await apiRequest(`/api/holidays/${holidayId}`, 'DELETE', {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/holidays/company', user?.companyId] });
