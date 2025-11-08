@@ -1,0 +1,441 @@
+👷‍♂️ EMPLOYEE SIDE — ATTENDANCE SECTION (Detailed Breakdown)
+
+🧭 1️⃣ Dashboard Summary (Today’s Attendance Overview)
+Purpose: Quick view of today’s attendance status.
+UI Components:
+
+
+“Check-In” button (active before login time)
+
+
+“Check-Out” button (active after check-in)
+
+
+Card showing:
+
+
+Date (e.g., Saturday, 8 Nov 2025)
+
+
+Status: 🟢 Present | 🔴 Absent | 🟡 Late | 🟣 On Leave
+
+
+Check-In Time
+
+
+Check-Out Time
+
+
+Total Worked Hours
+
+
+Shift (e.g., 9:00 AM – 6:00 PM)
+
+
+
+
+Live “Clock” (showing current time)
+
+
+Geo/IP or device validation indicator
+
+
+Data Flow:
+
+
+When employee checks in → system records:
+
+
+user_id
+
+
+timestamp
+
+
+GPS / IP
+
+
+shift_id
+
+
+device_id
+
+
+company_id
+
+
+
+
+When employee checks out → updates the same attendance record.
+
+
+System auto-calculates total work duration and marks status:
+
+
+Late if check-in > shift_start + grace
+
+
+Early out if check-out < shift_end - grace
+
+
+Absent if no check-in
+
+
+
+
+
+📅 2️⃣ Attendance History (Month / Date Range)
+Purpose: Allow employee to review past attendance.
+UI Components:
+
+
+Calendar view with color-coded dots:
+
+
+🟢 Present, 🔴 Absent, 🟡 Late, 🔵 Leave, ⚪ Holiday
+
+
+
+
+Table view (optional toggle)
+
+
+Date | Check-In | Check-Out | Hours | Status | Remarks
+
+
+
+
+Filter: Month, Year, Date range
+
+
+Export (personal PDF summary)
+
+
+Data Flow:
+
+
+Fetch from attendance_records table filtered by user_id.
+
+
+Use shift definitions to compute late/early flags.
+
+
+Combine with leaves + holidays tables for context.
+
+
+
+🔄 3️⃣ Mark Attendance (Self Check-In/Out)
+Purpose: Employee manually logs their presence.
+Process:
+
+
+On login → show “Check-In” button (if not yet checked in).
+
+
+Once clicked:
+
+
+Validate allowed device (if device binding is active)
+
+
+Capture GPS/IP
+
+
+Store time in attendance record
+
+
+
+
+“Check-Out” button appears → similar flow for end time.
+
+
+If employee forgets → can request correction later.
+
+
+Rules:
+
+
+Check-in only once per day.
+
+
+Check-out only after check-in.
+
+
+Late / early-out flagged automatically.
+
+
+
+🧾 4️⃣ Correction Requests
+Purpose: Fix missed or wrong attendance logs.
+Flow:
+
+
+Employee clicks “Request Correction”.
+
+
+Select date → enter correct check-in/check-out + reason.
+
+
+Admin receives the request in “Pending Corrections”.
+
+
+Admin Approves / Rejects → updates main record.
+
+
+Status + comments sent back to employee notification center.
+
+
+UI Fields:
+
+
+Date (select)
+
+
+Corrected Time In / Time Out
+
+
+Reason text area
+
+
+Attachment (optional)
+
+
+
+🏅 5️⃣ Rewards or Penalties
+Purpose: Motivate consistent attendance.
+Rules:
+
+
++10 points: On-time streak of 5 days
+
+
++20 points: No absence for a month
+
+
+-5 points: More than 3 late marks
+
+
+Visible in dashboard card
+
+
+UI Example:
+
+“This Month: 95% Attendance — +20 Reward Points 🎉”
+
+
+🔔 6️⃣ Notifications
+System Sends:
+
+
+Late check-in warning
+
+
+Missing checkout reminder
+
+
+Approved / Rejected correction updates
+
+
+Reward announcements
+
+
+
+👨‍💼 ADMIN SIDE — ATTENDANCE SECTION (Detailed Breakdown)
+
+🧭 1️⃣ Daily Attendance Monitor
+Purpose: Real-time view of who is present, late, or absent.
+UI Components:
+
+
+Filter bar: Company ▾ | Department ▾ | Team ▾ | Date ▾ | Shift ▾
+
+
+Attendance Table:
+| Employee | Check-In | Check-Out | Duration | Status | Correction |
+
+
+Status colors:
+
+
+🟢 Present, 🟡 Late, 🔴 Absent, 🟣 On Leave
+
+
+
+
+Summary stats on top:
+
+
+Total Employees / Present / Absent / Late / Leave
+
+
+
+
+Logic:
+
+
+Fetch all attendance records for selected day.
+
+
+Compare against employee shift times.
+
+
+If no record → mark Absent automatically.
+
+
+
+🧍‍♂️ 2️⃣ Manual Attendance Control
+Purpose: Fix missing or incorrect data.
+Options:
+
+
+“Add Attendance” (for an employee/date)
+
+
+“Edit Attendance” (update in/out time)
+
+
+“Approve Correction Requests” tab:
+
+
+List of pending employee requests
+
+
+Show requested times + reason
+
+
+Buttons: ✅ Approve / ❌ Reject
+
+
+
+
+When Approved:
+
+
+Update main record
+
+
+Log audit trail in attendance_logs
+
+
+Notify employee
+
+
+
+⚙️ 3️⃣ Attendance Policy Management
+Purpose: Define global or department-specific rules.
+Configurable Options:
+
+
+Shift timings (Multiple shifts allowed)
+
+
+Grace period (minutes)
+
+
+Half-day rules
+
+
+Late count → auto-penalty or deduction
+
+
+Holiday list management
+
+
+Enable / Disable employee self check-in
+
+
+Set auto “absent” if no check-in before X hours
+
+
+Stored in: attendance_policy table (linked by company_id)
+
+📊 4️⃣ Attendance Reports & Analytics
+Purpose: Admin insights and payroll export.
+Report Types:
+
+
+Daily Report
+
+
+List of all employees for selected day.
+
+
+
+
+Monthly Summary
+
+
+Employee | Total Present | Absent | Leave | Late | Hours | %
+
+
+
+
+Departmental Breakdown
+
+
+Average attendance by team/department
+
+
+
+
+Export
+
+
+Excel, PDF, CSV
+
+
+Filter by company/department/team/date
+
+
+
+
+Visuals:
+
+
+Pie chart: Present vs Absent
+
+
+Bar chart: Late trend by department
+
+
+Line chart: Company attendance % over time
+
+
+
+🔔 5️⃣ Automation & Notifications
+Automatic Tasks (cron / scheduler):
+
+
+9:30 AM → Send “Late” warning to absent employees.
+
+
+6:00 PM → Send reminder to check out.
+
+
+Midnight → Auto-mark absentees with no check-in.
+
+
+Weekly summary email to admins.
+
+
+
+🧩 6️⃣ Integrations
+
+
+Biometric / RFID sync (auto import logs)
+
+
+GPS / QR attendance tracking API
+
+
+Payroll API (for salary deductions)
+
+
+Reward system sync
+
+
+
+🧠 DATA RELATION OVERVIEW
+TableKey FieldsPurposeusersid, name, role, department_idStores employee/admin infoattendance_recordsuser_id, date, checkin, checkout, statusCore attendance dataattendance_policycompany_id, shift_start, grace_periodDefines rulescorrection_requestsuser_id, date, requested_time, reason, statusEmployee correctionsrewardsuser_id, points, reason, dateReward tracking
+
+Would you like me to now extend this into a UI layout flow (pages + sidebar structure) — for both Employee and Admin dashboards (so you can visualize or design it in React next)?

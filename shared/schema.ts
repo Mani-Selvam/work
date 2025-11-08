@@ -256,6 +256,85 @@ export const tasksReports = pgTable("tasks_reports", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const shifts = pgTable("shifts", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").references(() => companies.id).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  startTime: varchar("start_time", { length: 10 }).notNull(),
+  endTime: varchar("end_time", { length: 10 }).notNull(),
+  gracePeriod: integer("grace_period").notNull().default(15),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const attendancePolicies = pgTable("attendance_policies", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").references(() => companies.id).notNull(),
+  halfDayHours: integer("half_day_hours").notNull().default(4),
+  fullDayHours: integer("full_day_hours").notNull().default(8),
+  lateMarkThreshold: integer("late_mark_threshold").notNull().default(3),
+  autoAbsentHours: integer("auto_absent_hours").notNull().default(2),
+  allowSelfCheckIn: boolean("allow_self_check_in").notNull().default(true),
+  requireGPS: boolean("require_gps").notNull().default(false),
+  requireDeviceBinding: boolean("require_device_binding").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const attendanceRecords = pgTable("attendance_records", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  companyId: integer("company_id").references(() => companies.id).notNull(),
+  shiftId: integer("shift_id").references(() => shifts.id),
+  date: varchar("date", { length: 10 }).notNull(),
+  checkIn: timestamp("check_in"),
+  checkOut: timestamp("check_out"),
+  workDuration: integer("work_duration"),
+  status: varchar("status", { length: 20 }).notNull().default("absent"),
+  gpsLocation: text("gps_location"),
+  ipAddress: varchar("ip_address", { length: 50 }),
+  deviceId: varchar("device_id", { length: 255 }),
+  remarks: text("remarks"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const correctionRequests = pgTable("correction_requests", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  companyId: integer("company_id").references(() => companies.id).notNull(),
+  attendanceId: integer("attendance_id").references(() => attendanceRecords.id),
+  date: varchar("date", { length: 10 }).notNull(),
+  requestedCheckIn: timestamp("requested_check_in"),
+  requestedCheckOut: timestamp("requested_check_out"),
+  reason: text("reason").notNull(),
+  attachment: text("attachment"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  reviewedBy: integer("reviewed_by").references(() => users.id),
+  reviewComments: text("review_comments"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const rewards = pgTable("rewards", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  companyId: integer("company_id").references(() => companies.id).notNull(),
+  points: integer("points").notNull(),
+  reason: varchar("reason", { length: 255 }).notNull(),
+  date: varchar("date", { length: 10 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const attendanceLogs = pgTable("attendance_logs", {
+  id: serial("id").primaryKey(),
+  attendanceId: integer("attendance_id").references(() => attendanceRecords.id).notNull(),
+  action: varchar("action", { length: 100 }).notNull(),
+  performedBy: integer("performed_by").references(() => users.id).notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertCompanySchema = createInsertSchema(companies).omit({
   id: true,
   serverId: true,
@@ -535,3 +614,53 @@ export const insertTasksReportSchema = createInsertSchema(tasksReports).omit({
 
 export type InsertTasksReport = z.infer<typeof insertTasksReportSchema>;
 export type TasksReport = typeof tasksReports.$inferSelect;
+
+export const insertShiftSchema = createInsertSchema(shifts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertShift = z.infer<typeof insertShiftSchema>;
+export type Shift = typeof shifts.$inferSelect;
+
+export const insertAttendancePolicySchema = createInsertSchema(attendancePolicies).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertAttendancePolicy = z.infer<typeof insertAttendancePolicySchema>;
+export type AttendancePolicy = typeof attendancePolicies.$inferSelect;
+
+export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema>;
+export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
+
+export const insertCorrectionRequestSchema = createInsertSchema(correctionRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCorrectionRequest = z.infer<typeof insertCorrectionRequestSchema>;
+export type CorrectionRequest = typeof correctionRequests.$inferSelect;
+
+export const insertRewardSchema = createInsertSchema(rewards).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertReward = z.infer<typeof insertRewardSchema>;
+export type Reward = typeof rewards.$inferSelect;
+
+export const insertAttendanceLogSchema = createInsertSchema(attendanceLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAttendanceLog = z.infer<typeof insertAttendanceLogSchema>;
+export type AttendanceLog = typeof attendanceLogs.$inferSelect;

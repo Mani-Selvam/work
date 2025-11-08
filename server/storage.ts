@@ -1,6 +1,7 @@
 ﻿import { db } from "./db";
 import { 
-  companies, users, tasks, reports, messages, ratings, fileUploads, archiveReports, groupMessages, taskTimeLogs, feedbacks, slotPricing, companyPayments, passwordResetTokens, adminActivityLogs, badges, attendanceLogs, attendanceRewards, autoTasks, leaves, holidays, tasksReports, attendanceIssues,
+  companies, users, tasks, reports, messages, ratings, fileUploads, archiveReports, groupMessages, taskTimeLogs, feedbacks, slotPricing, companyPayments, passwordResetTokens, adminActivityLogs, badges, autoTasks, leaves, holidays, tasksReports,
+  shifts, attendancePolicies, attendanceRecords, correctionRequests, rewards, attendanceLogs,
   type Company, type InsertCompany,
   type User, type InsertUser,
   type Task, type InsertTask,
@@ -17,13 +18,16 @@ import {
   type PasswordResetToken,
   type AdminActivityLog, type InsertAdminActivityLog,
   type Badge, type InsertBadge,
-  type AttendanceLog, type InsertAttendanceLog,
-  type AttendanceReward, type InsertAttendanceReward,
   type AutoTask, type InsertAutoTask,
   type Leave, type InsertLeave,
   type Holiday, type InsertHoliday,
   type TasksReport, type InsertTasksReport,
-  type AttendanceIssue, type InsertAttendanceIssue
+  type Shift, type InsertShift,
+  type AttendancePolicy, type InsertAttendancePolicy,
+  type AttendanceRecord, type InsertAttendanceRecord,
+  type CorrectionRequest, type InsertCorrectionRequest,
+  type Reward, type InsertReward,
+  type AttendanceLog, type InsertAttendanceLog,
 } from "@shared/schema";
 import { eq, and, or, desc, gte, lte, sql, inArray } from "drizzle-orm";
 
@@ -203,43 +207,9 @@ export interface IStorage {
   getAllBadges(): Promise<Badge[]>;
   getBadgeById(id: number): Promise<Badge | null>;
   
-  // Attendance log operations
-  markAttendance(userId: number, companyId: number, loginTime: Date): Promise<AttendanceLog>;
-  markAbsent(userId: number, companyId: number, date: string): Promise<AttendanceLog | null>;
-  updateAttendanceLogout(userId: number, companyId: number, date: string, logoutTime: Date): Promise<void>;
-  getAttendanceLog(userId: number, companyId: number, date: string): Promise<AttendanceLog | null>;
-  getAttendanceLogsByUser(userId: number, startDate?: string, endDate?: string): Promise<AttendanceLog[]>;
-  getAttendanceLogsByCompany(companyId: number, date?: string): Promise<AttendanceLog[]>;
-  getAttendanceLogsByDateRange(companyId: number, startDate: string, endDate: string): Promise<AttendanceLog[]>;
-  
-  // Attendance reward operations
-  getOrCreateAttendanceReward(userId: number, companyId: number): Promise<AttendanceReward>;
-  updateAttendanceReward(userId: number, updates: Partial<InsertAttendanceReward>): Promise<void>;
-  getAttendanceRewardByUser(userId: number): Promise<AttendanceReward | null>;
-  getTopPerformers(companyId: number, limit: number): Promise<Array<AttendanceReward & { user: User }>>;
-  assignBadge(userId: number, badgeName: string): Promise<void>;
-  
   // Auto task operations
   createAutoTask(task: InsertAutoTask): Promise<AutoTask>;
   getRecentAutoTasks(limit: number): Promise<AutoTask[]>;
-  
-  // Attendance analytics
-  getAttendanceStats(companyId: number, date: string): Promise<{
-    totalEmployees: number;
-    presentToday: number;
-    absentToday: number;
-    lateToday: number;
-    onTimePercentage: number;
-  }>;
-  
-  getMonthlyAttendanceReport(userId: number, month: number, year: number): Promise<{
-    totalDays: number;
-    presentDays: number;
-    lateDays: number;
-    absentDays: number;
-    totalPoints: number;
-    averageHours: number;
-  }>;
   
   // Leave operations
   createLeave(leave: InsertLeave): Promise<Leave>;
@@ -261,15 +231,44 @@ export interface IStorage {
   getTasksReportByDate(userId: number, date: string): Promise<TasksReport | null>;
   getTasksReportsByUserId(userId: number): Promise<TasksReport[]>;
   
-  // Attendance issue operations
-  createAttendanceIssue(issue: InsertAttendanceIssue): Promise<AttendanceIssue>;
-  getAttendanceIssuesByUserId(userId: number): Promise<AttendanceIssue[]>;
-  getPendingAttendanceIssues(companyId: number): Promise<AttendanceIssue[]>;
-  updateAttendanceIssueStatus(issueId: number, status: string, approvedBy: number, adminRemarks?: string): Promise<void>;
+  // NEW ATTENDANCE SYSTEM - Shift Management
+  createShift(shift: InsertShift): Promise<Shift>;
+  getShiftsByCompany(companyId: number): Promise<Shift[]>;
+  getShiftById(id: number): Promise<Shift | null>;
   
-  // Enhanced attendance operations
-  updateAttendanceLog(logId: number, updates: Partial<InsertAttendanceLog>): Promise<void>;
-  getAttendanceLogById(id: number): Promise<AttendanceLog | null>;
+  // NEW ATTENDANCE SYSTEM - Policy Management
+  createOrUpdateAttendancePolicy(policy: InsertAttendancePolicy): Promise<AttendancePolicy>;
+  getAttendancePolicyByCompany(companyId: number): Promise<AttendancePolicy | null>;
+  
+  // NEW ATTENDANCE SYSTEM - Attendance Records
+  createAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord>;
+  updateAttendanceRecord(id: number, updates: Partial<InsertAttendanceRecord>): Promise<AttendanceRecord>;
+  getAttendanceById(id: number): Promise<AttendanceRecord | null>;
+  getAttendanceByUserAndDate(userId: number, date: string): Promise<AttendanceRecord | null>;
+  getAttendanceHistory(userId: number, startDate: string, endDate: string): Promise<AttendanceRecord[]>;
+  getDailyAttendance(companyId: number, date: string): Promise<AttendanceRecord[]>;
+  getMonthlyAttendanceSummary(userId: number, month: number, year: number): Promise<{
+    totalDays: number;
+    presentDays: number;
+    lateDays: number;
+    absentDays: number;
+    totalHours: number;
+  }>;
+  getAttendanceReport(companyId: number, startDate: string, endDate: string, type: string): Promise<any>;
+  
+  // NEW ATTENDANCE SYSTEM - Correction Requests
+  createCorrectionRequest(request: InsertCorrectionRequest): Promise<CorrectionRequest>;
+  updateCorrectionRequest(id: number, updates: Partial<InsertCorrectionRequest>): Promise<CorrectionRequest>;
+  getCorrectionRequestById(id: number): Promise<CorrectionRequest | null>;
+  getCorrectionRequestsByUser(userId: number): Promise<CorrectionRequest[]>;
+  getPendingCorrectionRequests(companyId: number): Promise<CorrectionRequest[]>;
+  
+  // NEW ATTENDANCE SYSTEM - Rewards
+  createReward(reward: InsertReward): Promise<Reward>;
+  getRewardsByUser(userId: number): Promise<Reward[]>;
+  
+  // NEW ATTENDANCE SYSTEM - Attendance Logs (Audit Trail)
+  createAttendanceLog(log: InsertAttendanceLog): Promise<AttendanceLog>;
 }
 
 export class DbStorage implements IStorage {
@@ -1332,6 +1331,231 @@ export class DbStorage implements IStorage {
       .where(eq(holidays.id, id))
       .limit(1);
     return result[0] || null;
+  }
+
+  // Auto Task operations (stub)
+  async createAutoTask(task: InsertAutoTask): Promise<AutoTask> {
+    const result = await db.insert(autoTasks).values(task).returning();
+    return result[0];
+  }
+
+  async getRecentAutoTasks(limit: number): Promise<AutoTask[]> {
+    return await db.select().from(autoTasks)
+      .orderBy(desc(autoTasks.executedAt))
+      .limit(limit);
+  }
+
+  async getPendingLeaves(companyId: number): Promise<Leave[]> {
+    return await db.select().from(leaves)
+      .where(and(
+        eq(leaves.companyId, companyId),
+        eq(leaves.status, 'pending')
+      ))
+      .orderBy(desc(leaves.createdAt));
+  }
+
+  // ==================== NEW ATTENDANCE SYSTEM IMPLEMENTATIONS ====================
+  
+  // Shift Management
+  async createShift(shift: InsertShift): Promise<Shift> {
+    const result = await db.insert(shifts).values(shift).returning();
+    return result[0];
+  }
+
+  async getShiftsByCompany(companyId: number): Promise<Shift[]> {
+    return await db.select().from(shifts)
+      .where(eq(shifts.companyId, companyId))
+      .orderBy(desc(shifts.createdAt));
+  }
+
+  async getShiftById(id: number): Promise<Shift | null> {
+    const result = await db.select().from(shifts)
+      .where(eq(shifts.id, id))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  // Attendance Policy Management
+  async createOrUpdateAttendancePolicy(policy: InsertAttendancePolicy): Promise<AttendancePolicy> {
+    const existing = await db.select().from(attendancePolicies)
+      .where(eq(attendancePolicies.companyId, policy.companyId))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      const updated = await db.update(attendancePolicies)
+        .set({ ...policy, updatedAt: new Date() })
+        .where(eq(attendancePolicies.companyId, policy.companyId))
+        .returning();
+      return updated[0];
+    } else {
+      const result = await db.insert(attendancePolicies).values(policy).returning();
+      return result[0];
+    }
+  }
+
+  async getAttendancePolicyByCompany(companyId: number): Promise<AttendancePolicy | null> {
+    const result = await db.select().from(attendancePolicies)
+      .where(eq(attendancePolicies.companyId, companyId))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  // Attendance Record Management
+  async createAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord> {
+    const result = await db.insert(attendanceRecords).values(record).returning();
+    return result[0];
+  }
+
+  async updateAttendanceRecord(id: number, updates: Partial<InsertAttendanceRecord>): Promise<AttendanceRecord> {
+    const result = await db.update(attendanceRecords)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(attendanceRecords.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getAttendanceById(id: number): Promise<AttendanceRecord | null> {
+    const result = await db.select().from(attendanceRecords)
+      .where(eq(attendanceRecords.id, id))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  async getAttendanceByUserAndDate(userId: number, date: string): Promise<AttendanceRecord | null> {
+    const result = await db.select().from(attendanceRecords)
+      .where(and(
+        eq(attendanceRecords.userId, userId),
+        eq(attendanceRecords.date, date)
+      ))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  async getAttendanceHistory(userId: number, startDate: string, endDate: string): Promise<AttendanceRecord[]> {
+    return await db.select().from(attendanceRecords)
+      .where(and(
+        eq(attendanceRecords.userId, userId),
+        gte(attendanceRecords.date, startDate),
+        lte(attendanceRecords.date, endDate)
+      ))
+      .orderBy(desc(attendanceRecords.date));
+  }
+
+  async getDailyAttendance(companyId: number, date: string): Promise<AttendanceRecord[]> {
+    return await db.select().from(attendanceRecords)
+      .where(and(
+        eq(attendanceRecords.companyId, companyId),
+        eq(attendanceRecords.date, date)
+      ))
+      .orderBy(attendanceRecords.userId);
+  }
+
+  async getMonthlyAttendanceSummary(userId: number, month: number, year: number): Promise<{
+    totalDays: number;
+    presentDays: number;
+    lateDays: number;
+    absentDays: number;
+    totalHours: number;
+  }> {
+    const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;
+    
+    const records = await this.getAttendanceHistory(userId, startDate, endDate);
+    
+    const presentDays = records.filter(r => r.status === 'present').length;
+    const lateDays = records.filter(r => r.status === 'late').length;
+    const absentDays = records.filter(r => r.status === 'absent').length;
+    const totalHours = records.reduce((sum, r) => sum + (r.workDuration || 0), 0) / 60;
+    
+    return {
+      totalDays: records.length,
+      presentDays,
+      lateDays,
+      absentDays,
+      totalHours: Math.round(totalHours * 10) / 10,
+    };
+  }
+
+  async getAttendanceReport(companyId: number, startDate: string, endDate: string, type: string): Promise<any> {
+    const records = await db.select().from(attendanceRecords)
+      .where(and(
+        eq(attendanceRecords.companyId, companyId),
+        gte(attendanceRecords.date, startDate),
+        lte(attendanceRecords.date, endDate)
+      ))
+      .orderBy(attendanceRecords.date);
+    
+    if (type === 'summary') {
+      const totalRecords = records.length;
+      const presentCount = records.filter(r => r.status === 'present').length;
+      const lateCount = records.filter(r => r.status === 'late').length;
+      const absentCount = records.filter(r => r.status === 'absent').length;
+      
+      return {
+        totalRecords,
+        presentCount,
+        lateCount,
+        absentCount,
+        presentPercentage: totalRecords > 0 ? Math.round((presentCount / totalRecords) * 100) : 0,
+      };
+    }
+    
+    return records;
+  }
+
+  // Correction Request Management
+  async createCorrectionRequest(request: InsertCorrectionRequest): Promise<CorrectionRequest> {
+    const result = await db.insert(correctionRequests).values(request).returning();
+    return result[0];
+  }
+
+  async updateCorrectionRequest(id: number, updates: Partial<InsertCorrectionRequest>): Promise<CorrectionRequest> {
+    const result = await db.update(correctionRequests)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(correctionRequests.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getCorrectionRequestById(id: number): Promise<CorrectionRequest | null> {
+    const result = await db.select().from(correctionRequests)
+      .where(eq(correctionRequests.id, id))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  async getCorrectionRequestsByUser(userId: number): Promise<CorrectionRequest[]> {
+    return await db.select().from(correctionRequests)
+      .where(eq(correctionRequests.userId, userId))
+      .orderBy(desc(correctionRequests.createdAt));
+  }
+
+  async getPendingCorrectionRequests(companyId: number): Promise<CorrectionRequest[]> {
+    return await db.select().from(correctionRequests)
+      .where(and(
+        eq(correctionRequests.companyId, companyId),
+        eq(correctionRequests.status, 'pending')
+      ))
+      .orderBy(desc(correctionRequests.createdAt));
+  }
+
+  // Reward Management
+  async createReward(reward: InsertReward): Promise<Reward> {
+    const result = await db.insert(rewards).values(reward).returning();
+    return result[0];
+  }
+
+  async getRewardsByUser(userId: number): Promise<Reward[]> {
+    return await db.select().from(rewards)
+      .where(eq(rewards.userId, userId))
+      .orderBy(desc(rewards.createdAt));
+  }
+
+  // Attendance Log (Audit Trail)
+  async createAttendanceLog(log: InsertAttendanceLog): Promise<AttendanceLog> {
+    const result = await db.insert(attendanceLogs).values(log).returning();
+    return result[0];
   }
 }
 
