@@ -640,6 +640,12 @@ export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords
 export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema>;
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 
+export type DailyAttendanceRecord = AttendanceRecord & {
+  userName: string | null;
+  userEmail: string | null;
+  userPhotoURL: string | null;
+};
+
 export const insertCorrectionRequestSchema = createInsertSchema(correctionRequests).omit({
   id: true,
   createdAt: true,

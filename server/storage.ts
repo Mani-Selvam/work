@@ -25,6 +25,7 @@ import {
   type Shift, type InsertShift,
   type AttendancePolicy, type InsertAttendancePolicy,
   type AttendanceRecord, type InsertAttendanceRecord,
+  type DailyAttendanceRecord,
   type CorrectionRequest, type InsertCorrectionRequest,
   type Reward, type InsertReward,
   type AttendanceLog, type InsertAttendanceLog,
@@ -246,7 +247,7 @@ export interface IStorage {
   getAttendanceById(id: number): Promise<AttendanceRecord | null>;
   getAttendanceByUserAndDate(userId: number, date: string): Promise<AttendanceRecord | null>;
   getAttendanceHistory(userId: number, startDate: string, endDate: string): Promise<AttendanceRecord[]>;
-  getDailyAttendance(companyId: number, date: string): Promise<AttendanceRecord[]>;
+  getDailyAttendance(companyId: number, date: string): Promise<DailyAttendanceRecord[]>;
   getMonthlyAttendanceSummary(userId: number, month: number, year: number): Promise<{
     totalDays: number;
     presentDays: number;
@@ -1441,7 +1442,7 @@ export class DbStorage implements IStorage {
       .orderBy(desc(attendanceRecords.date));
   }
 
-  async getDailyAttendance(companyId: number, date: string): Promise<any[]> {
+  async getDailyAttendance(companyId: number, date: string): Promise<DailyAttendanceRecord[]> {
     const results = await db
       .select({
         id: attendanceRecords.id,

@@ -5,14 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Calendar, Users, Clock, UserCheck, UserX } from "lucide-react";
 import { format } from "date-fns";
-import type { AttendanceRecord } from "@shared/schema";
+import type { DailyAttendanceRecord } from "@shared/schema";
 
 export default function AttendanceMonitor() {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
   );
 
-  const { data: attendanceRecords, isLoading } = useQuery<AttendanceRecord[]>({
+  const { data: attendanceRecords, isLoading } = useQuery<DailyAttendanceRecord[]>({
     queryKey: ["/api/admin/attendance/daily", selectedDate],
     queryFn: async () => {
       const response = await fetch(`/api/admin/attendance/daily?date=${selectedDate}`, {
@@ -148,7 +148,7 @@ export default function AttendanceMonitor() {
                   </tr>
                 </thead>
                 <tbody>
-                  {attendanceRecords.map((record: any) => (
+                  {attendanceRecords.map((record) => (
                     <tr
                       key={record.id}
                       className="border-b last:border-0 hover-elevate"

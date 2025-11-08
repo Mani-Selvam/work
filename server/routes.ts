@@ -2986,6 +2986,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: true,
         reviewedBy: true,
         reviewComments: true,
+        requestedCheckIn: true,
+        requestedCheckOut: true,
       }).extend({
         attendanceId: z.number().optional().nullable(),
         requestedCheckIn: z.string().or(z.date()).optional().nullable().transform((val) => {
