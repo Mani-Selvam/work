@@ -3046,6 +3046,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requestingUserId = parseInt(req.headers["x-user-id"] as string);
       const requestingUser = await storage.getUserById(requestingUserId);
       
+      console.log('[ATTENDANCE DEBUG] Request query:', req.query);
+      console.log('[ATTENDANCE DEBUG] Requesting user:', { id: requestingUser?.id, role: requestingUser?.role, companyId: requestingUser?.companyId });
+      
       if (!requestingUser || (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')) {
         return res.status(403).json({ message: "Only admins can view attendance monitor" });
       }
@@ -3054,6 +3057,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const targetCompanyId = requestingUser.role === 'super_admin' 
         ? parseInt(companyId as string)
         : requestingUser.companyId;
+      
+      console.log('[ATTENDANCE DEBUG] Target companyId:', targetCompanyId);
+      console.log('[ATTENDANCE DEBUG] Date:', date || new Date().toISOString().split('T')[0]);
       
       if (!targetCompanyId) {
         return res.status(400).json({ message: "Company ID required" });
@@ -3064,8 +3070,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (date as string) || new Date().toISOString().split('T')[0]
       );
       
+      console.log('[ATTENDANCE DEBUG] Records found:', records.length);
+      console.log('[ATTENDANCE DEBUG] Sample record:', records[0]);
+      
       res.json(records);
     } catch (error) {
+      console.error('[ATTENDANCE DEBUG] Error:', error);
       next(error);
     }
   });
