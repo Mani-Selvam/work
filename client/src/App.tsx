@@ -28,6 +28,7 @@ import AttendanceHistory from "@/pages/user/AttendanceHistory";
 import CorrectionRequests from "@/pages/user/CorrectionRequests";
 import Dashboard from "@/pages/admin/Dashboard";
 import LeaveApproval from "@/pages/admin/LeaveApproval";
+import CorrectionApproval from "@/pages/admin/CorrectionApproval";
 import AttendanceMonitor from "@/pages/admin/AttendanceMonitor";
 import AttendanceReports from "@/pages/admin/AttendanceReports";
 import AttendancePolicy from "@/pages/admin/AttendancePolicy";
@@ -147,6 +148,9 @@ function Router() {
       </Route>
       <Route path="/admin/leaves">
         {() => <ProtectedRoute component={() => <AdminLayout><LeaveApproval /></AdminLayout>} allowedRole="admin" />}
+      </Route>
+      <Route path="/admin/corrections">
+        {() => <ProtectedRoute component={() => <AdminLayout><CorrectionApproval /></AdminLayout>} allowedRole="admin" />}
       </Route>
       <Route path="/admin/attendance">
         {() => <ProtectedRoute component={() => <AdminLayout><AttendanceMonitor /></AdminLayout>} allowedRole="admin" />}
