@@ -1577,6 +1577,36 @@ export class DbStorage implements IStorage {
     const result = await db.insert(attendanceLogs).values(log).returning();
     return result[0];
   }
+
+  // Mark users as absent if they haven't checked in
+  async markAbsentUsers(date: string): Promise<number> {
+    const allActiveUsers = await this.getAllUsers(false);
+    let markedCount = 0;
+    
+    for (const user of allActiveUsers) {
+      if (!user.companyId) continue;
+      
+      const existingRecord = await this.getAttendanceByUserAndDate(user.id, date);
+      
+      if (!existingRecord) {
+        const absentRecord = {
+          userId: user.id,
+          companyId: user.companyId,
+          date: date,
+          status: 'absent' as const,
+          checkIn: null,
+          checkOut: null,
+          workDuration: null,
+          remarks: 'Auto-marked absent - no check-in',
+        };
+        
+        await this.createAttendanceRecord(absentRecord);
+        markedCount++;
+      }
+    }
+    
+    return markedCount;
+  }
 }
 
 export const storage = new DbStorage();

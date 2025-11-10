@@ -88,6 +88,20 @@ async function initializeSuperAdmin() {
     
     await initializeSuperAdmin();
 
+    cron.schedule('59 23 * * *', async () => {
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const markedCount = await storage.markAbsentUsers(today);
+            log(`✅ Auto-marked ${markedCount} users as absent for ${today}`);
+        } catch (error) {
+            console.error('Error in daily absent marking cron job:', error);
+        }
+    }, {
+        timezone: "Asia/Kolkata"
+    });
+    
+    log('📅 Daily absent marking cron job scheduled at 11:59 PM IST');
+
     const wss = new WebSocketServer({ noServer: true });
 
     server.on("upgrade", (request, socket, head) => {

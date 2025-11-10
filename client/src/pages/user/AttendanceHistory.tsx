@@ -13,6 +13,14 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+interface Holiday {
+  id: number;
+  companyId: number;
+  name: string;
+  date: string;
+  description: string | null;
+}
+
 export default function AttendanceHistory() {
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
@@ -22,8 +30,17 @@ export default function AttendanceHistory() {
   const startDate = format(startOfMonth(new Date(selectedYear, selectedMonth)), "yyyy-MM-dd");
   const endDate = format(endOfMonth(new Date(selectedYear, selectedMonth)), "yyyy-MM-dd");
 
+  const { data: user } = useQuery<{ id: number; companyId: number | null }>({ 
+    queryKey: ['/api/me'] 
+  });
+
   const { data: attendanceRecords, isLoading } = useQuery<AttendanceRecord[]>({
     queryKey: ["/api/attendance/history", { startDate, endDate }],
+  });
+
+  const { data: holidays = [] } = useQuery<Holiday[]>({
+    queryKey: [`/api/holidays/company/${user?.companyId}`],
+    enabled: !!user?.companyId,
   });
 
   const { data: monthlySummary } = useQuery<{
@@ -48,12 +65,20 @@ export default function AttendanceHistory() {
     return attendanceRecords.find(record => record.date === dateStr);
   };
 
+  const getHolidayForDate = (date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return holidays.find(holiday => holiday.date === dateStr);
+  };
+
   const filteredRecords = attendanceRecords?.filter(record => {
     if (statusFilter === "all") return true;
     return record.status === statusFilter;
   }) || [];
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, isHoliday: boolean = false) => {
+    if (isHoliday) {
+      return "bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700";
+    }
     const colors: Record<string, string> = {
       present: "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700",
       absent: "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700",
@@ -267,6 +292,29 @@ export default function AttendanceHistory() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex flex-wrap gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700"></div>
+              <span className="text-muted-foreground">Present</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700"></div>
+              <span className="text-muted-foreground">Late</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700"></div>
+              <span className="text-muted-foreground">Absent</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700"></div>
+              <span className="text-muted-foreground">Leave</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-orange-100 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700"></div>
+              <span className="text-muted-foreground">Holiday</span>
+            </div>
+          </div>
+
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -285,6 +333,7 @@ export default function AttendanceHistory() {
 
               {daysInMonth.map((day) => {
                 const attendance = getAttendanceForDate(day);
+                const holiday = getHolidayForDate(day);
                 const isToday = isSameDay(day, new Date());
                 const shouldShow = statusFilter === "all" || attendance?.status === statusFilter;
 
@@ -294,15 +343,23 @@ export default function AttendanceHistory() {
                     className={`
                       p-3 rounded-md border-2 min-h-[100px] relative
                       ${isToday ? "border-primary" : "border-border"}
-                      ${attendance && shouldShow ? getStatusColor(attendance.status) : "bg-background"}
-                      ${!shouldShow && attendance ? "opacity-30" : ""}
+                      ${holiday ? getStatusColor("", true) : attendance && shouldShow ? getStatusColor(attendance.status) : "bg-background"}
+                      ${!shouldShow && attendance && !holiday ? "opacity-30" : ""}
                     `}
                     data-testid={`calendar-day-${format(day, "yyyy-MM-dd")}`}
                   >
                     <div className="text-sm font-semibold mb-2">
                       {format(day, "d")}
                     </div>
-                    {attendance && shouldShow && (
+                    {holiday && (
+                      <div className="space-y-1 text-xs">
+                        <div className="font-semibold text-orange-700 dark:text-orange-300">{holiday.name}</div>
+                        {holiday.description && (
+                          <div className="text-orange-600 dark:text-orange-400">{holiday.description}</div>
+                        )}
+                      </div>
+                    )}
+                    {attendance && shouldShow && !holiday && (
                       <div className="space-y-1 text-xs">
                         <div className="font-medium">{getStatusBadge(attendance.status)}</div>
                         {attendance.checkIn && (

@@ -2910,12 +2910,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get company policy to check if GPS is required
       const policy = await storage.getAttendancePolicyByCompany(user.companyId);
       
+      const checkInTime = new Date();
+      const checkInHour = checkInTime.getHours();
+      const checkInMinutes = checkInTime.getMinutes();
+      const totalMinutes = checkInHour * 60 + checkInMinutes;
+      const tenAM = 10 * 60;
+      
+      const isLate = totalMinutes > tenAM;
+      const status: 'late' | 'present' = isLate ? 'late' : 'present';
+      
       const checkInData = {
         userId,
         companyId: user.companyId,
         date: today,
-        checkIn: new Date(),
-        status: 'present' as const,
+        checkIn: checkInTime,
+        status,
         gpsLocation: validatedBody.gpsLocation || null,
         ipAddress: req.ip || null,
         deviceId: validatedBody.deviceId || null,
