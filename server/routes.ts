@@ -2995,6 +2995,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // Employee: Mark as leave
+  app.post("/api/attendance/mark-leave", requireAuth, async (req, res, next) => {
+    try {
+      const userId = parseInt(req.headers["x-user-id"] as string);
+      const user = await storage.getUserById(userId);
+      
+      if (!user || !user.companyId) {
+        return res.status(404).json({ message: "User or company not found" });
+      }
+      
+      const markLeaveSchema = z.object({
+        reason: z.string().min(10, "Reason must be at least 10 characters"),
+        date: z.string().optional(),
+      });
+      
+      const validatedBody = markLeaveSchema.parse(req.body);
+      const targetDate = validatedBody.date || new Date().toISOString().split('T')[0];
+      
+      // Check if already has attendance record for this date
+      const existingRecord = await storage.getAttendanceByUserAndDate(userId, targetDate);
+      if (existingRecord && existingRecord.checkIn) {
+        return res.status(400).json({ message: "Already checked in for this date. Cannot mark as leave." });
+      }
+      
+      const leaveData = {
+        userId,
+        companyId: user.companyId,
+        date: targetDate,
+        status: 'leave' as const,
+        remarks: validatedBody.reason,
+      };
+      
+      const record = existingRecord
+        ? await storage.updateAttendanceRecord(existingRecord.id, leaveData)
+        : await storage.createAttendanceRecord(leaveData);
+      
+      res.json(record);
+    } catch (error) {
+      next(error);
+    }
+  });
   
   // Employee: Request correction
   app.post("/api/attendance/correction-request", requireAuth, async (req, res, next) => {
@@ -3308,6 +3350,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       res.json(report);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Admin: Get user attendance history
+  app.get("/api/admin/attendance/history/:userId", requireAdmin, async (req, res, next) => {
+    try {
+      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
+      const requestingUser = await storage.getUserById(requestingUserId);
+      const targetUserId = parseInt(req.params.userId);
+      const { month, year } = req.query;
+      
+      if (!requestingUser || (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')) {
+        return res.status(403).json({ message: "Only admins can view user attendance history" });
+      }
+      
+      // Get target user to verify company access
+      const targetUser = await storage.getUserById(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Ensure admin can only view users from their company (unless super admin)
+      if (requestingUser.role === 'company_admin' && targetUser.companyId !== requestingUser.companyId) {
+        return res.status(403).json({ message: "You can only view attendance for users in your company" });
+      }
+      
+      // Default to current month if not provided
+      const now = new Date();
+      const targetMonth = month ? parseInt(month as string) : now.getMonth() + 1;
+      const targetYear = year ? parseInt(year as string) : now.getFullYear();
+      
+      const startDate = `${targetYear}-${targetMonth.toString().padStart(2, '0')}-01`;
+      const lastDay = new Date(targetYear, targetMonth, 0).getDate();
+      const endDate = `${targetYear}-${targetMonth.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+      
+      const records = await storage.getAttendanceHistory(targetUserId, startDate, endDate);
+      const summary = await storage.getMonthlyAttendanceSummary(targetUserId, targetMonth, targetYear);
+      
+      res.json({
+        records,
+        summary,
+        user: {
+          id: targetUser.id,
+          displayName: targetUser.displayName,
+          email: targetUser.email,
+        },
+      });
     } catch (error) {
       next(error);
     }

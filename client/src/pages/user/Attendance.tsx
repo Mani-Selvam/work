@@ -3,8 +3,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, LogIn, LogOut, Calendar, Award } from "lucide-react";
+import { Clock, LogIn, LogOut, Calendar, Award, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { AttendanceRecord, Reward } from "@shared/schema";
@@ -12,6 +14,8 @@ import type { AttendanceRecord, Reward } from "@shared/schema";
 export default function Attendance() {
   const { toast } = useToast();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [leaveReason, setLeaveReason] = useState("");
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -70,6 +74,40 @@ export default function Attendance() {
       });
     },
   });
+
+  const markLeaveMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      return await apiRequest("/api/attendance/mark-leave", "POST", { reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/attendance/today"] });
+      setLeaveDialogOpen(false);
+      setLeaveReason("");
+      toast({
+        title: "Leave Marked Successfully",
+        description: "Your attendance has been marked as leave for today.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Mark Leave",
+        description: error.message || "Unable to mark leave. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleMarkLeave = () => {
+    if (leaveReason.trim().length < 10) {
+      toast({
+        title: "Validation Error",
+        description: "Reason must be at least 10 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+    markLeaveMutation.mutate(leaveReason);
+  };
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: any; label: string }> = {
@@ -148,16 +186,28 @@ export default function Attendance() {
             )}
 
             <div className="flex gap-2 pt-4">
-              {!todayAttendance?.checkIn && (
-                <Button
-                  onClick={() => checkInMutation.mutate()}
-                  disabled={checkInMutation.isPending}
-                  className="flex-1"
-                  data-testid="button-checkin"
-                >
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Check In
-                </Button>
+              {!todayAttendance?.checkIn && !todayAttendance?.status && (
+                <>
+                  <Button
+                    onClick={() => checkInMutation.mutate()}
+                    disabled={checkInMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-checkin"
+                  >
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Check In
+                  </Button>
+                  <Button
+                    onClick={() => setLeaveDialogOpen(true)}
+                    disabled={markLeaveMutation.isPending}
+                    variant="outline"
+                    className="flex-1"
+                    data-testid="button-mark-leave"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Mark as Leave
+                  </Button>
+                </>
               )}
               {todayAttendance?.checkIn && !todayAttendance?.checkOut && (
                 <Button
@@ -175,6 +225,13 @@ export default function Attendance() {
                 <div className="flex-1 p-3 text-center border rounded-md bg-muted">
                   <p className="text-sm text-muted-foreground">
                     You have completed your attendance for today
+                  </p>
+                </div>
+              )}
+              {todayAttendance?.status === 'leave' && (
+                <div className="flex-1 p-3 text-center border rounded-md bg-muted">
+                  <p className="text-sm text-muted-foreground">
+                    You are marked as on leave for today
                   </p>
                 </div>
               )}
@@ -219,6 +276,48 @@ export default function Attendance() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark as Leave</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for marking today as leave. This will be visible to your admin.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Textarea
+              placeholder="Enter your reason for leave (minimum 10 characters)..."
+              value={leaveReason}
+              onChange={(e) => setLeaveReason(e.target.value)}
+              className="min-h-[100px]"
+              data-testid="textarea-leave-reason"
+            />
+            <p className="text-sm text-muted-foreground">
+              {leaveReason.length}/10 characters minimum
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLeaveDialogOpen(false);
+                setLeaveReason("");
+              }}
+              data-testid="button-cancel-leave"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleMarkLeave}
+              disabled={markLeaveMutation.isPending || leaveReason.trim().length < 10}
+              data-testid="button-submit-leave"
+            >
+              {markLeaveMutation.isPending ? "Submitting..." : "Submit Leave"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
