@@ -1215,10 +1215,15 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getLeavesByUserId(userId: number): Promise<Leave[]> {
-    return await db.select().from(leaves)
+  async getLeavesByUserId(userId: number): Promise<any[]> {
+    const results = await db.select().from(leaves)
       .where(eq(leaves.userId, userId))
       .orderBy(desc(leaves.createdAt));
+    
+    return results.map(r => ({
+      ...r,
+      appliedDate: r.createdAt,
+    }));
   }
 
   async getLeavesByCompanyId(companyId: number): Promise<any[]> {
@@ -1234,6 +1239,7 @@ export class DbStorage implements IStorage {
       approvedBy: leaves.approvedBy,
       remarks: leaves.remarks,
       createdAt: leaves.createdAt,
+      updatedAt: leaves.updatedAt,
       userName: users.displayName,
     }).from(leaves)
       .leftJoin(users, eq(leaves.userId, users.id))
@@ -1242,18 +1248,7 @@ export class DbStorage implements IStorage {
     
     return results.map(r => ({
       ...r,
-      id: r.id,
-      userId: r.userId,
-      companyId: r.companyId,
-      leaveType: r.leaveType,
-      startDate: r.startDate,
-      endDate: r.endDate,
-      reason: r.reason,
-      status: r.status,
-      approvedBy: r.approvedBy,
-      remarks: r.remarks,
-      createdAt: r.createdAt,
-      userName: r.userName,
+      appliedDate: r.createdAt,
     }));
   }
 
