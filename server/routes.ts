@@ -2561,6 +2561,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/me", requireAuth, async (req, res, next) => {
+    try {
+      const userId = parseInt(req.headers["x-user-id"] as string);
+      const user = await storage.getUserById(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({
+        id: user.id,
+        uniqueUserId: user.uniqueUserId,
+        email: user.email,
+        displayName: user.displayName,
+        role: user.role,
+        companyId: user.companyId,
+        photoURL: user.photoURL,
+        isActive: user.isActive,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/leaves", requireAuth, async (req, res, next) => {
     try {
       const userId = parseInt(req.headers["x-user-id"] as string);
