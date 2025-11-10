@@ -1938,14 +1938,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/feedbacks", async (req, res, next) => {
     try {
+      const requestingUserId = req.headers['x-user-id'];
+      if (!requestingUserId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
+      if (!requestingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
       const { userId } = req.query;
       
       if (userId) {
         const feedbacks = await storage.getFeedbacksByUserId(parseInt(userId as string));
         res.json(feedbacks);
       } else {
-        const feedbacks = await storage.getAllFeedbacks();
-        res.json(feedbacks);
+        // Admin viewing all company feedbacks
+        if (requestingUser.role === 'company_admin' || requestingUser.role === 'super_admin') {
+          const allFeedbacks = await storage.getAllFeedbacks();
+          // Filter by company unless super_admin
+          if (requestingUser.role === 'super_admin') {
+            res.json(allFeedbacks);
+          } else {
+            // Get all users in the company
+            const companyUsers = await storage.getUsersByCompanyId(requestingUser.companyId!);
+            const companyUserIds = companyUsers.map(u => u.id);
+            const companyFeedbacks = allFeedbacks.filter(f => companyUserIds.includes(f.userId));
+            res.json(companyFeedbacks);
+          }
+        } else {
+          // Regular users can only see their own feedbacks
+          const feedbacks = await storage.getFeedbacksByUserId(requestingUser.id);
+          res.json(feedbacks);
+        }
       }
     } catch (error) {
       next(error);

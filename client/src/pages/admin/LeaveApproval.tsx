@@ -16,7 +16,7 @@ export default function LeaveApproval() {
   });
 
   const { data: leaves = [], isLoading } = useQuery<LeaveWithUser[]>({
-    queryKey: ['/api/leaves/company', user?.companyId],
+    queryKey: [`/api/leaves/company/${user?.companyId}`],
     enabled: !!user?.companyId,
   });
 
@@ -25,7 +25,7 @@ export default function LeaveApproval() {
       return await apiRequest(`/api/leaves/${leaveId}/approve`, 'PATCH', {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leaves/company', user?.companyId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/leaves/company/${user?.companyId}`] });
       toast({
         title: "Leave approved",
         description: "The leave request has been approved successfully.",
@@ -45,7 +45,7 @@ export default function LeaveApproval() {
       return await apiRequest(`/api/leaves/${leaveId}/reject`, 'PATCH', {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leaves/company', user?.companyId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/leaves/company/${user?.companyId}`] });
       toast({
         title: "Leave rejected",
         description: "The leave request has been rejected.",
