@@ -20,7 +20,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   
   const cleanPath = location.split('?')[0].replace(/\/$/, '');
-  const formType = cleanPath === '/register' ? 'register' : cleanPath === '/login/admin' ? 'admin' : 'user';
+  const formType = cleanPath === '/register' ? 'register' : cleanPath === '/login/admin' ? 'admin' : cleanPath === '/login/team-leader' ? 'team-leader' : 'user';
   
   const [companyRegData, setCompanyRegData] = useState({ 
     name: "", 
@@ -34,13 +34,17 @@ export default function LoginPage() {
   });
   const [companyAdminData, setCompanyAdminData] = useState({ companyName: "", email: "", serverId: "", password: "" });
   const [companyUserData, setCompanyUserData] = useState({ username: "", userId: "", password: "" });
+  const [teamLeaderData, setTeamLeaderData] = useState({ teamId: "", password: "" });
 
   useEffect(() => {
     if (user && userRole) {
       const isAdmin = userRole === "super_admin" || userRole === "company_admin";
       const isUser = userRole === "company_member";
+      const isTeamLeader = userRole === "team_leader";
       if (isAdmin) {
         setLocation("/admin");
+      } else if (isTeamLeader) {
+        setLocation("/user");
       } else if (isUser) {
         setLocation("/user");
       }
@@ -135,6 +139,34 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(companyUserData),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Login failed');
+      }
+      
+      const userData = await response.json();
+      setUser(userData);
+      setUserRole(userData.role);
+      setDbUserId(userData.id);
+      setCompanyId(userData.companyId || null);
+      localStorage.setItem('user', JSON.stringify(userData));
+    } catch (error: any) {
+      setError(error.message || "Login failed");
+      setIsLoading(false);
+    }
+  };
+
+  const handleTeamLeaderLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+    try {
+      const response = await fetch('/api/auth/team-leader-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(teamLeaderData),
       });
       
       if (!response.ok) {
@@ -306,11 +338,72 @@ export default function LoginPage() {
                   <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-user-login">
                     {isLoading ? "Signing in..." : "Sign In"}
                   </Button>
-                  <div className="text-center text-sm text-muted-foreground">
-                    Company admin?{" "}
+                  <div className="flex flex-wrap justify-center gap-2 text-center text-sm text-muted-foreground">
+                    <span>Company admin?{" "}
                     <Link href="/login/admin" className="text-primary hover:underline" data-testid="link-to-admin-login-from-user">
                       Admin Login
-                    </Link>
+                    </Link></span>
+                    <span>|</span>
+                    <span>Team leader?{" "}
+                    <Link href="/login/team-leader" className="text-primary hover:underline" data-testid="link-to-team-leader-login">
+                      Team Leader Login
+                    </Link></span>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {formType === 'team-leader' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Team Leader Login</CardTitle>
+                <CardDescription>Login with your team ID</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleTeamLeaderLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="team-id">Team ID</Label>
+                    <Input
+                      id="team-id"
+                      type="text"
+                      placeholder="team-XXXXXX"
+                      value={teamLeaderData.teamId}
+                      onChange={(e) => setTeamLeaderData({ ...teamLeaderData, teamId: e.target.value })}
+                      required
+                      data-testid="input-team-id"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="team-leader-password">Password</Label>
+                      <Link href="/forgot-password" className="text-xs text-primary hover:underline" data-testid="link-forgot-password-team-leader">
+                        Forgot Password?
+                      </Link>
+                    </div>
+                    <Input
+                      id="team-leader-password"
+                      type="password"
+                      value={teamLeaderData.password}
+                      onChange={(e) => setTeamLeaderData({ ...teamLeaderData, password: e.target.value })}
+                      required
+                      data-testid="input-team-leader-password"
+                    />
+                  </div>
+                  {error && <p className="text-sm text-red-500" data-testid="error-message">{error}</p>}
+                  <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-team-leader-login">
+                    {isLoading ? "Signing in..." : "Sign In"}
+                  </Button>
+                  <div className="flex flex-wrap justify-center gap-2 text-center text-sm text-muted-foreground">
+                    <span>Company admin?{" "}
+                    <Link href="/login/admin" className="text-primary hover:underline" data-testid="link-to-admin-login-from-team-leader">
+                      Admin Login
+                    </Link></span>
+                    <span>|</span>
+                    <span>Employee?{" "}
+                    <Link href="/login" className="text-primary hover:underline" data-testid="link-to-user-login-from-team-leader">
+                      Employee Login
+                    </Link></span>
                   </div>
                 </form>
               </CardContent>

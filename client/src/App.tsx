@@ -34,6 +34,7 @@ import AttendanceReports from "@/pages/admin/AttendanceReports";
 import AttendancePolicy from "@/pages/admin/AttendancePolicy";
 import HolidayManagement from "@/pages/admin/HolidayManagement";
 import Users from "@/pages/admin/Users";
+import TeamLeaders from "@/pages/admin/TeamLeaders";
 import AdminReports from "@/pages/admin/AdminReports";
 import AdminTasks from "@/pages/admin/AdminTasks";
 import AdminMessages from "@/pages/admin/AdminMessages";
@@ -67,6 +68,7 @@ function ProtectedRoute({ component: Component, allowedRole }: { component: any;
   const isSuperAdmin = userRole === "super_admin";
   const isCompanyAdmin = userRole === "company_admin";
   const isUser = userRole === "company_member";
+  const isTeamLeader = userRole === "team_leader";
 
   if (allowedRole === "super_admin" && !isSuperAdmin) {
     if (isCompanyAdmin) {
@@ -79,7 +81,7 @@ function ProtectedRoute({ component: Component, allowedRole }: { component: any;
     return <Redirect to="/user" />;
   }
 
-  if (allowedRole === "user" && !isUser) {
+  if (allowedRole === "user" && !isUser && !isTeamLeader) {
     if (isSuperAdmin) {
       return <Redirect to="/super-admin" />;
     }
@@ -99,7 +101,9 @@ function Router() {
       <Route path="/verify" component={EmailVerification} />
       <Route path="/login/admin" component={LoginPage} />
       <Route path="/login/user" component={LoginPage} />
+      <Route path="/login/team-leader" component={LoginPage} />
       <Route path="/login/company" component={() => <Redirect to="/login/admin" />} />
+      <Route path="/login" component={LoginPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/forgot-company-id" component={ForgotCompanyIdPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
@@ -166,6 +170,9 @@ function Router() {
       </Route>
       <Route path="/admin/users">
         {() => <ProtectedRoute component={() => <AdminLayout><Users /></AdminLayout>} allowedRole="admin" />}
+      </Route>
+      <Route path="/admin/team-leaders">
+        {() => <ProtectedRoute component={() => <AdminLayout><TeamLeaders /></AdminLayout>} allowedRole="admin" />}
       </Route>
       <Route path="/admin/reports">
         {() => <ProtectedRoute component={() => <AdminLayout><AdminReports /></AdminLayout>} allowedRole="admin" />}
