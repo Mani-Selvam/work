@@ -1581,16 +1581,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Task routes
-  app.post("/api/tasks", async (req, res, next) => {
+  app.post("/api/tasks", loadUserContext, authorizePermissions(["tasks:manage:all", "tasks:manage:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      if (!requestingUser || !requestingUser.companyId) {
+      const requestingUser = req.context.user;
+      if (!requestingUser.companyId) {
         return res.status(403).json({ message: "User must belong to a company" });
+      }
+
+      const assignedToId = req.body.assignedTo;
+
+      // Enforce team scoping for team leaders
+      if (assignedToId && requestingUser.role === 'team_leader') {
+        if (!req.context.teamScope) {
+          return res.status(403).json({ message: "Team leader without assigned team" });
+        }
+        const teamMemberIds = req.context.teamScope.memberIds;
+        if (!teamMemberIds.includes(assignedToId)) {
+          return res.status(403).json({ message: "Cannot assign tasks to users outside your team" });
+        }
+      } else if (assignedToId && requestingUser.role !== 'super_admin') {
+        // Company admins can only assign to users in their company
+        const assignedUser = await storage.getUserById(assignedToId);
+        if (!assignedUser || assignedUser.companyId !== requestingUser.companyId) {
+          return res.status(403).json({ message: "Cannot assign tasks to users outside your company" });
+        }
       }
 
       const validatedTask = insertTaskSchema.parse({ ...req.body, companyId: requestingUser.companyId });
@@ -1680,26 +1698,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/tasks/:id/status", async (req, res, next) => {
+  app.patch("/api/tasks/:id/status", loadUserContext, authorizePermissions(["tasks:manage:all", "tasks:manage:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      if (!requestingUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
+      const requestingUser = req.context.user;
       const task = await storage.getTaskById(parseInt(req.params.id));
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Check company access unless super_admin
-      if (requestingUser.role !== 'super_admin' && task.companyId !== requestingUser.companyId) {
-        return res.status(403).json({ message: "Access denied" });
+      // Enforce team scoping for team leaders
+      if (requestingUser.role === 'team_leader') {
+        if (!req.context.teamScope) {
+          return res.status(403).json({ message: "Team leader without assigned team" });
+        }
+        const teamMemberIds = req.context.teamScope.memberIds;
+        // Team leaders can update tasks assigned to their team members or themselves
+        if (!teamMemberIds.includes(task.assignedTo) && task.assignedTo !== requestingUser.id) {
+          return res.status(403).json({ message: "Cannot update tasks outside your team" });
+        }
+      } else if (requestingUser.role !== 'super_admin') {
+        // Company access check for non-super admins
+        if (task.companyId !== requestingUser.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
       }
 
       const { status } = req.body;
@@ -1710,26 +1735,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/tasks/:id", async (req, res, next) => {
+  app.patch("/api/tasks/:id", loadUserContext, authorizePermissions(["tasks:update:all", "tasks:update:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      if (!requestingUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
+      const requestingUser = req.context.user;
       const task = await storage.getTaskById(parseInt(req.params.id));
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Check company access unless super_admin
-      if (requestingUser.role !== 'super_admin' && task.companyId !== requestingUser.companyId) {
-        return res.status(403).json({ message: "Access denied" });
+      // Enforce team scoping for team leaders
+      if (requestingUser.role === 'team_leader') {
+        if (!req.context.teamScope) {
+          return res.status(403).json({ message: "Team leader without assigned team" });
+        }
+        const teamMemberIds = req.context.teamScope.memberIds;
+        // Team leaders can update tasks assigned to their team members or themselves
+        if (!teamMemberIds.includes(task.assignedTo) && task.assignedTo !== requestingUser.id) {
+          return res.status(403).json({ message: "Cannot update tasks outside your team" });
+        }
+        // If updating assignedTo, verify new assignee is in team
+        if (req.body.assignedTo && !teamMemberIds.includes(req.body.assignedTo)) {
+          return res.status(403).json({ message: "Cannot reassign tasks to users outside your team" });
+        }
+      } else if (requestingUser.role !== 'super_admin') {
+        // Company access check for non-super admins
+        if (task.companyId !== requestingUser.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
       }
 
       const updates = req.body;
@@ -1740,26 +1776,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/tasks/:id", async (req, res, next) => {
+  app.delete("/api/tasks/:id", loadUserContext, authorizePermissions(["tasks:manage:all", "tasks:manage:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      if (!requestingUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
+      const requestingUser = req.context.user;
       const task = await storage.getTaskById(parseInt(req.params.id));
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Check company access unless super_admin
-      if (requestingUser.role !== 'super_admin' && task.companyId !== requestingUser.companyId) {
-        return res.status(403).json({ message: "Access denied" });
+      // Enforce team scoping for team leaders
+      if (requestingUser.role === 'team_leader') {
+        if (!req.context.teamScope) {
+          return res.status(403).json({ message: "Team leader without assigned team" });
+        }
+        const teamMemberIds = req.context.teamScope.memberIds;
+        // Team leaders can delete tasks assigned to their team members or themselves
+        if (!teamMemberIds.includes(task.assignedTo) && task.assignedTo !== requestingUser.id) {
+          return res.status(403).json({ message: "Cannot delete tasks outside your team" });
+        }
+      } else if (requestingUser.role !== 'super_admin') {
+        // Company access check for non-super admins
+        if (task.companyId !== requestingUser.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
       }
 
       await storage.deleteTask(parseInt(req.params.id));
@@ -1860,16 +1903,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Report routes
-  app.post("/api/reports", async (req, res, next) => {
+  app.post("/api/reports", loadUserContext, async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      if (!requestingUser || !requestingUser.companyId) {
+      const requestingUser = req.context.user;
+      if (!requestingUser.companyId) {
         return res.status(403).json({ message: "User must belong to a company" });
+      }
+
+      const reportUserId = req.body.userId;
+
+      // Validate the report userId
+      if (requestingUser.role === 'team_leader') {
+        if (!req.context.teamScope) {
+          return res.status(403).json({ message: "Team leader without assigned team" });
+        }
+        const teamMemberIds = req.context.teamScope.memberIds;
+        // Team leaders can submit reports for their team members or themselves
+        if (!teamMemberIds.includes(reportUserId) && reportUserId !== requestingUser.id) {
+          return res.status(403).json({ message: "Cannot submit reports for users outside your team" });
+        }
+      } else if (requestingUser.role === 'employee') {
+        // Regular employees can only submit their own reports
+        if (reportUserId !== requestingUser.id) {
+          return res.status(403).json({ message: "You can only submit your own reports" });
+        }
+      } else if (requestingUser.role !== 'super_admin') {
+        // Company admins can submit for anyone in their company
+        const targetUser = await storage.getUserById(reportUserId);
+        if (!targetUser || targetUser.companyId !== requestingUser.companyId) {
+          return res.status(403).json({ message: "Cannot submit reports for users outside your company" });
+        }
       }
 
       const validatedReport = insertReportSchema.parse({ ...req.body, companyId: requestingUser.companyId });
@@ -1948,9 +2015,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Message routes
-  app.post("/api/messages", async (req, res, next) => {
+  app.post("/api/messages", loadUserContext, async (req, res, next) => {
     try {
-      const validatedMessage = insertMessageSchema.parse(req.body);
+      if (!req.context) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const requestingUser = req.context.user;
+      const receiverId = req.body.receiverId;
+
+      // Verify receiver exists and is in the same company (unless super_admin)
+      if (requestingUser.role !== 'super_admin') {
+        const receiver = await storage.getUserById(receiverId);
+        if (!receiver) {
+          return res.status(404).json({ message: "Receiver not found" });
+        }
+        if (receiver.companyId !== requestingUser.companyId) {
+          return res.status(403).json({ message: "Cannot send messages to users outside your company" });
+        }
+      }
+
+      // Force senderId to be the authenticated user
+      const messageData = {
+        ...req.body,
+        senderId: requestingUser.id,
+      };
+
+      const validatedMessage = insertMessageSchema.parse(messageData);
       const message = await storage.createMessage(validatedMessage);
       res.json(message);
     } catch (error) {
@@ -1995,9 +2086,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/messages/:id/read", async (req, res, next) => {
+  app.patch("/api/messages/:id/read", loadUserContext, async (req, res, next) => {
     try {
-      await storage.markMessageAsRead(parseInt(req.params.id));
+      if (!req.context) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const requestingUser = req.context.user;
+      const messageId = parseInt(req.params.id);
+
+      // Verify the message exists and belongs to the requesting user
+      const message = await storage.getMessageById(messageId);
+      if (!message) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+
+      // Only the receiver (or super_admin) can mark a message as read
+      if (requestingUser.role !== 'super_admin' && message.receiverId !== requestingUser.id) {
+        return res.status(403).json({ message: "You can only mark your own messages as read" });
+      }
+
+      await storage.markMessageAsRead(messageId);
       res.json({ message: "Message marked as read" });
     } catch (error) {
       next(error);

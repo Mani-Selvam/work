@@ -93,6 +93,7 @@ export interface IStorage {
   
   // Message operations
   createMessage(message: InsertMessage): Promise<Message>;
+  getMessageById(id: number): Promise<Message | null>;
   getMessagesByReceiverId(receiverId: number): Promise<Message[]>;
   getUnreadMessagesByReceiverId(receiverId: number): Promise<Message[]>;
   markMessageAsRead(id: number): Promise<void>;
@@ -622,6 +623,11 @@ export class DbStorage implements IStorage {
   async createMessage(message: InsertMessage): Promise<Message> {
     const result = await db.insert(messages).values(message).returning();
     return result[0];
+  }
+
+  async getMessageById(id: number): Promise<Message | null> {
+    const result = await db.select().from(messages).where(eq(messages.id, id));
+    return result[0] || null;
   }
 
   async getMessagesByReceiverId(receiverId: number): Promise<Message[]> {
