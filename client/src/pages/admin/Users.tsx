@@ -13,6 +13,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionContext";
 import type { User } from "@shared/schema";
 import { Plus, Users as UsersIcon, Copy, CheckCircle } from "lucide-react";
 
@@ -29,6 +30,7 @@ interface CompanyData {
 export default function Users() {
   const { toast } = useToast();
   const { dbUserId, companyId, userRole } = useAuth();
+  const { isTeamLeader, teamScope, can } = usePermissions();
   const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [credentialsDialogOpen, setCredentialsDialogOpen] = useState(false);

@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -28,32 +29,48 @@ import {
 import ThemeToggle from "./ThemeToggle";
 import BottomNav, { BottomNavItem } from "./BottomNav";
 import CompanyDetailsSetupDialog from "./CompanyDetailsSetupDialog";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { Permission } from "@shared/permissions";
 
 interface NavItem {
   path: string;
   label: string;
   icon: any;
+  requiredPermission?: Permission;
 }
 
-const navItems: NavItem[] = [
-  { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/admin/company-profile", label: "Company Profile", icon: Building2 },
-  { path: "/admin/company", label: "Company Settings", icon: BarChart3 },
-  { path: "/admin/payment-history", label: "Payment History", icon: Receipt },
-  { path: "/admin/users", label: "Users", icon: Users },
-  { path: "/admin/team-leaders", label: "Team Leaders", icon: UserCog },
-  { path: "/admin/reports", label: "Reports", icon: FileText },
-  { path: "/admin/tasks", label: "Tasks", icon: CheckSquare },
-  { path: "/admin/messages", label: "Messages", icon: MessageSquare },
-  { path: "/admin/ratings", label: "Ratings", icon: Star },
-  { path: "/admin/feedback", label: "Feedback", icon: MessageCircle },
-  { path: "/admin/leaves", label: "Leave Approval", icon: Calendar },
-  { path: "/admin/corrections", label: "Correction Requests", icon: FileEdit },
-  { path: "/admin/attendance", label: "Attendance Monitor", icon: Clock },
-  { path: "/admin/attendance-reports", label: "Attendance Reports", icon: TrendingUp },
-  { path: "/admin/attendance-policy", label: "Attendance Policy", icon: Settings },
-  { path: "/admin/holidays", label: "Holiday Management", icon: Calendar },
+const companyAdminNavItems: NavItem[] = [
+  { path: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, requiredPermission: "dashboard:company" },
+  { path: "/admin/company-profile", label: "Company Profile", icon: Building2, requiredPermission: "company:profile:view" },
+  { path: "/admin/company", label: "Company Settings", icon: BarChart3, requiredPermission: "company:settings:view" },
+  { path: "/admin/payment-history", label: "Payment History", icon: Receipt, requiredPermission: "payment:view" },
+  { path: "/admin/users", label: "Users", icon: Users, requiredPermission: "users:view:all" },
+  { path: "/admin/team-leaders", label: "Team Leaders", icon: UserCog, requiredPermission: "users:view:all" },
+  { path: "/admin/reports", label: "Reports", icon: FileText, requiredPermission: "reports:view:all" },
+  { path: "/admin/tasks", label: "Tasks", icon: CheckSquare, requiredPermission: "tasks:view:all" },
+  { path: "/admin/messages", label: "Messages", icon: MessageSquare, requiredPermission: "messages:view:all" },
+  { path: "/admin/ratings", label: "Ratings", icon: Star, requiredPermission: "ratings:view:all" },
+  { path: "/admin/feedback", label: "Feedback", icon: MessageCircle, requiredPermission: "feedback:view:all" },
+  { path: "/admin/leaves", label: "Leave Approval", icon: Calendar, requiredPermission: "leave:approve:all" },
+  { path: "/admin/corrections", label: "Correction Requests", icon: FileEdit, requiredPermission: "correction:approve:all" },
+  { path: "/admin/attendance", label: "Attendance Monitor", icon: Clock, requiredPermission: "attendance:view:all" },
+  { path: "/admin/attendance-reports", label: "Attendance Reports", icon: TrendingUp, requiredPermission: "attendance:view:all" },
+  { path: "/admin/attendance-policy", label: "Attendance Policy", icon: Settings, requiredPermission: "attendance:policy:edit" },
+  { path: "/admin/holidays", label: "Holiday Management", icon: Calendar, requiredPermission: "holiday:manage" },
+];
+
+const teamLeaderNavItems: NavItem[] = [
+  { path: "/admin/dashboard", label: "My Team Dashboard", icon: LayoutDashboard, requiredPermission: "dashboard:team" },
+  { path: "/admin/users", label: "My Team Members", icon: Users, requiredPermission: "users:view:team" },
+  { path: "/admin/reports", label: "Team Reports", icon: FileText, requiredPermission: "reports:view:team" },
+  { path: "/admin/tasks", label: "Team Tasks", icon: CheckSquare, requiredPermission: "tasks:view:team" },
+  { path: "/admin/messages", label: "Team Messages", icon: MessageSquare, requiredPermission: "messages:view:team" },
+  { path: "/admin/ratings", label: "Team Ratings", icon: Star, requiredPermission: "ratings:view:team" },
+  { path: "/admin/feedback", label: "Team Feedback", icon: MessageCircle, requiredPermission: "feedback:view:team" },
+  { path: "/admin/leaves", label: "Team Leave Approval", icon: Calendar, requiredPermission: "leave:approve:team" },
+  { path: "/admin/corrections", label: "Team Corrections", icon: FileEdit, requiredPermission: "correction:approve:team" },
+  { path: "/admin/attendance", label: "Team Attendance", icon: Clock, requiredPermission: "attendance:view:team" },
+  { path: "/admin/holidays", label: "Holidays", icon: Calendar, requiredPermission: "holiday:view" },
 ];
 
 const superAdminNavItems: NavItem[] = [
@@ -78,14 +95,41 @@ const superAdminBottomNavItems: BottomNavItem[] = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, userRole, signOut, loggingOut, companyId, setUser } = useAuth();
+  const { can, isTeamLeader, isCompanyAdmin, isSuperAdmin } = usePermissions();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
-  
-  const isSuperAdmin = userRole === 'super_admin';
-  const isCompanyAdmin = userRole === 'company_admin';
-  
-  const filteredNavItems = isSuperAdmin ? superAdminNavItems : navItems;
-  const filteredBottomNavItems = isSuperAdmin ? superAdminBottomNavItems : bottomNavItems;
+
+  const filteredNavItems = useMemo(() => {
+    if (isSuperAdmin) {
+      return superAdminNavItems;
+    } else if (isTeamLeader) {
+      return teamLeaderNavItems.filter(item => {
+        if (!item.requiredPermission) return true;
+        return can(item.requiredPermission);
+      });
+    } else if (isCompanyAdmin) {
+      return companyAdminNavItems.filter(item => {
+        if (!item.requiredPermission) return true;
+        return can(item.requiredPermission);
+      });
+    }
+    return [];
+  }, [isSuperAdmin, isTeamLeader, isCompanyAdmin, can]);
+
+  const filteredBottomNavItems = useMemo(() => {
+    if (isSuperAdmin) {
+      return superAdminBottomNavItems;
+    } else if (isTeamLeader) {
+      return [
+        { path: "/admin/dashboard", label: "Team", icon: LayoutDashboard },
+        { path: "/admin/users", label: "Members", icon: Users },
+        { path: "/admin/tasks", label: "Tasks", icon: CheckSquare },
+        { path: "/admin/leaves", label: "Leaves", icon: Calendar },
+      ];
+    } else {
+      return bottomNavItems;
+    }
+  }, [isSuperAdmin, isTeamLeader]);
 
   useEffect(() => {
     if (isCompanyAdmin && user && companyId) {

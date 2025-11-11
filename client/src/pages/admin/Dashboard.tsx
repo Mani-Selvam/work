@@ -17,10 +17,12 @@ import { Users, FileText, CheckCircle, FolderOpen, Plus, MessageSquare, Building
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import type { SlotPricing, CompanyPayment, Company } from "@shared/schema";
+import { TeamLeaderDashboard } from "@/components/dashboard-widgets/TeamLeaderDashboard";
 
 interface CompanyData {
   id: number;
@@ -35,12 +37,17 @@ interface CompanyData {
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { dbUserId, companyId, userRole } = useAuth();
+  const { isTeamLeader, isCompanyAdmin, isSuperAdmin: isSuperAdminPerm } = usePermissions();
   const { toast } = useToast();
   const [editingPricing, setEditingPricing] = useState<{ slotType: string; price: string } | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const isSuperAdmin = userRole === "super_admin";
+
+  if (isTeamLeader) {
+    return <TeamLeaderDashboard />;
+  }
 
   const { data: stats } = useQuery<{
     totalUsers: number;

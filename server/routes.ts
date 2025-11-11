@@ -828,6 +828,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get Team Stats for Team Leader Dashboard
+  app.get("/api/team/stats", loadUserContext, authorizePermissions(["dashboard:team"]), async (req, res, next) => {
+    try {
+      const context = req.context!;
+      
+      if (!context.teamScope || !context.companyId) {
+        return res.status(403).json({ message: "Only team leaders can access team stats" });
+      }
+      
+      const memberIds = context.teamScope.memberIds;
+      const totalMembers = memberIds.length;
+      
+      const leaves = await storage.getLeavesByCompanyId(context.companyId);
+      const teamLeaves = leaves.filter(leave => memberIds.includes(leave.userId));
+      const pendingLeaves = teamLeaves.filter(leave => leave.status === 'pending').length;
+      
+      const tasks = await storage.getTasksByCompanyId(context.companyId);
+      const teamTasks = tasks.filter(task => task.assignedTo && memberIds.includes(task.assignedTo));
+      const pendingTasks = teamTasks.filter(task => task.status !== 'completed').length;
+      
+      const today = new Date().toISOString().split('T')[0];
+      let todayPresent = 0;
+      for (const memberId of memberIds) {
+        const attendance = await storage.getAttendanceByUserAndDate(memberId, today);
+        if (attendance && attendance.status === 'present') {
+          todayPresent++;
+        }
+      }
+      
+      res.json({
+        totalMembers,
+        pendingLeaves,
+        pendingTasks,
+        todayPresent,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // User routes
   app.post("/api/auth/signup", async (req, res, next) => {
     try {

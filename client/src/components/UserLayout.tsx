@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -21,26 +22,28 @@ import {
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import BottomNav, { BottomNavItem } from "./BottomNav";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Permission } from "@shared/permissions";
 
 interface NavItem {
   path: string;
   label: string;
   icon: any;
+  requiredPermission?: Permission;
 }
 
-const navItems: NavItem[] = [
-  { path: "/user/overview", label: "Overview", icon: LayoutDashboard },
+const allNavItems: NavItem[] = [
+  { path: "/user/overview", label: "Overview", icon: LayoutDashboard, requiredPermission: "dashboard:view" },
   { path: "/user/reports", label: "Reports", icon: FileText },
-  { path: "/user/messages", label: "Messages", icon: MessageSquare },
-  { path: "/user/feedback", label: "Feedback", icon: MessageCircle },
+  { path: "/user/messages", label: "Messages", icon: MessageSquare, requiredPermission: "messages:view:team" },
+  { path: "/user/feedback", label: "Feedback", icon: MessageCircle, requiredPermission: "feedback:send" },
   { path: "/user/announcements", label: "Announcements", icon: Megaphone },
-  { path: "/user/tasks", label: "Assigned Tasks", icon: ListTodo },
+  { path: "/user/tasks", label: "Assigned Tasks", icon: ListTodo, requiredPermission: "tasks:view:team" },
   { path: "/user/report-view", label: "View Reports", icon: Eye },
   { path: "/user/ratings", label: "Ratings", icon: Star },
   { path: "/user/leaves", label: "Leave Management", icon: Calendar },
-  { path: "/user/attendance", label: "Attendance", icon: Clock },
-  { path: "/user/attendance-history", label: "Attendance History", icon: History },
+  { path: "/user/attendance", label: "Attendance", icon: Clock, requiredPermission: "attendance:policy:view" },
+  { path: "/user/attendance-history", label: "Attendance History", icon: History, requiredPermission: "attendance:policy:view" },
   { path: "/user/correction-requests", label: "Correction Requests", icon: FileEdit },
 ];
 
@@ -54,7 +57,15 @@ const bottomNavItems: BottomNavItem[] = [
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, signOut, loggingOut } = useAuth();
+  const { can } = usePermissions();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navItems = useMemo(() => {
+    return allNavItems.filter(item => {
+      if (!item.requiredPermission) return true;
+      return can(item.requiredPermission);
+    });
+  }, [can]);
 
   const handleLogout = async () => {
     await signOut();
