@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCompanySchema, insertUserSchema, insertTaskSchema, insertReportSchema, insertMessageSchema, insertRatingSchema, insertFileUploadSchema, insertGroupMessageSchema, insertFeedbackSchema, loginSchema, signupSchema, firebaseSigninSchema, companyRegistrationSchema, companyBasicRegistrationSchema, superAdminLoginSchema, companyAdminLoginSchema, companyUserLoginSchema, insertSlotPricingSchema, insertCompanyPaymentSchema, updatePaymentStatusSchema, slotPurchaseSchema, passwordResetRequestSchema, passwordResetSchema, insertAttendanceRecordSchema, insertCorrectionRequestSchema } from "@shared/schema";
+import { insertCompanySchema, insertUserSchema, insertTaskSchema, insertReportSchema, insertMessageSchema, insertRatingSchema, insertFileUploadSchema, insertGroupMessageSchema, insertFeedbackSchema, loginSchema, signupSchema, firebaseSigninSchema, companyRegistrationSchema, companyBasicRegistrationSchema, superAdminLoginSchema, companyAdminLoginSchema, companyUserLoginSchema, insertSlotPricingSchema, insertCompanyPaymentSchema, updatePaymentStatusSchema, slotPurchaseSchema, passwordResetRequestSchema, passwordResetSchema, insertAttendanceRecordSchema, insertCorrectionRequestSchema, insertTeamLeaderSchema, insertTeamMemberSchema, teamLeaderLoginSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { sendReportNotification, sendCompanyServerIdEmail, sendUserIdEmail, sendPasswordResetEmail, sendPaymentConfirmationEmail, sendCompanyVerificationEmail } from "./email";
@@ -17,6 +17,15 @@ const stripe = process.env.STRIPE_SECRET_KEY
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
 const isGoogleOAuthConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+
+function generateUniqueId(prefix: string): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let id = '';
+  for (let i = 0; i < 6; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `${prefix}-${id}`;
+}
 
 async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const userId = parseInt(req.headers["x-user-id"] as string);
@@ -525,6 +534,308 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
       }
+      next(error);
+    }
+  });
+
+  // Team Leader Login
+  app.post("/api/auth/team-leader-login", async (req, res, next) => {
+    try {
+      const validatedData = teamLeaderLoginSchema.parse(req.body);
+      
+      const teamLeader = await storage.getTeamLeaderByTeamId(validatedData.teamId);
+      if (!teamLeader) {
+        return res.status(404).json({ message: "Team ID not found" });
+      }
+      
+      const user = await storage.getUserById(teamLeader.userId);
+      if (!user || !user.password) {
+        return res.status(401).json({ message: "Invalid team leader credentials" });
+      }
+      
+      if (!user.isActive) {
+        return res.status(401).json({ message: "Account is inactive. Please contact your administrator." });
+      }
+      
+      const isValidPassword = await bcrypt.compare(validatedData.password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid password" });
+      }
+      
+      const { password: _, ...userWithoutPassword } = user;
+      res.json({ 
+        ...userWithoutPassword, 
+        teamId: teamLeader.teamId,
+        teamName: teamLeader.teamName,
+        teamLeaderId: teamLeader.id
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
+  // Team Leader Management Routes
+  
+  // Create Team Leader (Admin Only)
+  app.post("/api/team-leaders", requireAdmin, async (req, res, next) => {
+    try {
+      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
+      const requestingUser = await storage.getUserById(requestingUserId);
+      
+      if (!requestingUser?.companyId) {
+        return res.status(400).json({ message: "Admin must be associated with a company" });
+      }
+      
+      const { userId, teamName, email, displayName, password } = req.body;
+      
+      let teamLeaderUserId = userId;
+      
+      if (!teamLeaderUserId) {
+        if (!email || !displayName || !password) {
+          return res.status(400).json({ message: "Either userId or email, displayName, and password are required" });
+        }
+        
+        const existingUser = await storage.getUserByEmail(email);
+        if (existingUser) {
+          return res.status(400).json({ message: "User with this email already exists" });
+        }
+        
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = await storage.createUser({
+          email,
+          displayName,
+          password: hashedPassword,
+          role: 'team_leader',
+          companyId: requestingUser.companyId,
+        });
+        
+        teamLeaderUserId = newUser.id;
+      } else {
+        const existingUser = await storage.getUserById(teamLeaderUserId);
+        if (!existingUser) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        if (existingUser.companyId !== requestingUser.companyId) {
+          return res.status(403).json({ message: "Cannot assign user from different company" });
+        }
+        
+        await storage.updateUserRole(teamLeaderUserId, 'team_leader');
+      }
+      
+      const existingTeamLeader = await storage.getTeamLeaderByUserId(teamLeaderUserId);
+      if (existingTeamLeader) {
+        return res.status(400).json({ message: "User is already a team leader" });
+      }
+      
+      const teamId = generateUniqueId('team');
+      
+      const teamLeader = await storage.createTeamLeader({
+        userId: teamLeaderUserId,
+        companyId: requestingUser.companyId,
+        teamId,
+        teamName,
+        createdBy: requestingUserId,
+      });
+      
+      const user = await storage.getUserById(teamLeaderUserId);
+      
+      res.json({ 
+        ...teamLeader,
+        user: user ? { id: user.id, email: user.email, displayName: user.displayName } : null,
+        message: `Team Leader created successfully with Team ID: ${teamId}`
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+  
+  // Get All Team Leaders for Company
+  app.get("/api/team-leaders", requireAuth, async (req, res, next) => {
+    try {
+      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
+      const requestingUser = await storage.getUserById(requestingUserId);
+      
+      if (!requestingUser?.companyId) {
+        return res.status(400).json({ message: "User must be associated with a company" });
+      }
+      
+      const teamLeaders = await storage.getTeamLeadersByCompanyId(requestingUser.companyId);
+      
+      const teamLeadersWithUsers = await Promise.all(
+        teamLeaders.map(async (tl) => {
+          const user = await storage.getUserById(tl.userId);
+          return {
+            ...tl,
+            user: user ? { id: user.id, email: user.email, displayName: user.displayName, photoURL: user.photoURL } : null
+          };
+        })
+      );
+      
+      res.json(teamLeadersWithUsers);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Get Team Leader by ID
+  app.get("/api/team-leaders/:id", requireAuth, async (req, res, next) => {
+    try {
+      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
+      const requestingUser = await storage.getUserById(requestingUserId);
+      
+      const teamLeader = await storage.getTeamLeaderById(parseInt(req.params.id));
+      if (!teamLeader) {
+        return res.status(404).json({ message: "Team leader not found" });
+      }
+      
+      if (requestingUser?.role !== 'super_admin' && 
+          requestingUser?.role !== 'company_admin' && 
+          teamLeader.userId !== requestingUserId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const user = await storage.getUserById(teamLeader.userId);
+      res.json({
+        ...teamLeader,
+        user: user ? { id: user.id, email: user.email, displayName: user.displayName, photoURL: user.photoURL } : null
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Get Team Members
+  app.get("/api/team-leaders/:id/members", requireAuth, async (req, res, next) => {
+    try {
+      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
+      const requestingUser = await storage.getUserById(requestingUserId);
+      
+      const teamLeader = await storage.getTeamLeaderById(parseInt(req.params.id));
+      if (!teamLeader) {
+        return res.status(404).json({ message: "Team leader not found" });
+      }
+      
+      if (requestingUser?.role !== 'super_admin' && 
+          requestingUser?.role !== 'company_admin' && 
+          teamLeader.userId !== requestingUserId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const members = await storage.listTeamMembers(teamLeader.id);
+      const membersWithoutPasswords = members.map(({ password: _, ...user }) => user);
+      
+      res.json(membersWithoutPasswords);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Get Unassigned Eligible Members
+  app.get("/api/team-leaders/:id/unassigned", requireAuth, async (req, res, next) => {
+    try {
+      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
+      const requestingUser = await storage.getUserById(requestingUserId);
+      
+      const teamLeader = await storage.getTeamLeaderById(parseInt(req.params.id));
+      if (!teamLeader) {
+        return res.status(404).json({ message: "Team leader not found" });
+      }
+      
+      if (requestingUser?.role !== 'super_admin' && 
+          requestingUser?.role !== 'company_admin' && 
+          teamLeader.userId !== requestingUserId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const unassignedMembers = await storage.getUnassignedEligibleMembers(teamLeader.companyId);
+      const membersWithoutPasswords = unassignedMembers.map(({ password: _, ...user }) => user);
+      
+      res.json(membersWithoutPasswords);
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Add Member to Team
+  app.post("/api/team-leaders/:id/members", requireAuth, async (req, res, next) => {
+    try {
+      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
+      const requestingUser = await storage.getUserById(requestingUserId);
+      
+      const teamLeader = await storage.getTeamLeaderById(parseInt(req.params.id));
+      if (!teamLeader) {
+        return res.status(404).json({ message: "Team leader not found" });
+      }
+      
+      if (requestingUser?.role !== 'super_admin' && 
+          requestingUser?.role !== 'company_admin' && 
+          teamLeader.userId !== requestingUserId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ message: "userId is required" });
+      }
+      
+      const userToAdd = await storage.getUserById(userId);
+      if (!userToAdd) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (userToAdd.companyId !== teamLeader.companyId) {
+        return res.status(400).json({ message: "User must belong to the same company" });
+      }
+      
+      const alreadyInTeam = await storage.isUserInTeam(userId);
+      if (alreadyInTeam) {
+        return res.status(400).json({ message: "User is already assigned to a team" });
+      }
+      
+      const teamMember = await storage.addTeamMember({
+        teamLeaderId: teamLeader.id,
+        userId,
+        companyId: teamLeader.companyId,
+        assignedBy: requestingUserId,
+      });
+      
+      res.json({ 
+        ...teamMember, 
+        message: "Employee added to team successfully" 
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+  
+  // Remove Member from Team
+  app.delete("/api/team-leaders/:id/members/:userId", requireAuth, async (req, res, next) => {
+    try {
+      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
+      const requestingUser = await storage.getUserById(requestingUserId);
+      
+      const teamLeader = await storage.getTeamLeaderById(parseInt(req.params.id));
+      if (!teamLeader) {
+        return res.status(404).json({ message: "Team leader not found" });
+      }
+      
+      if (requestingUser?.role !== 'super_admin' && 
+          requestingUser?.role !== 'company_admin' && 
+          teamLeader.userId !== requestingUserId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      await storage.removeTeamMember(teamLeader.id, parseInt(req.params.userId));
+      
+      res.json({ message: "Employee removed from team successfully" });
+    } catch (error) {
       next(error);
     }
   });

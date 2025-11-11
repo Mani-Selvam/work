@@ -1,7 +1,7 @@
 ﻿import { db } from "./db";
 import { 
   companies, users, tasks, reports, messages, ratings, fileUploads, archiveReports, groupMessages, taskTimeLogs, feedbacks, slotPricing, companyPayments, passwordResetTokens, adminActivityLogs, badges, autoTasks, leaves, holidays, tasksReports,
-  shifts, attendancePolicies, attendanceRecords, correctionRequests, rewards, attendanceLogs,
+  shifts, attendancePolicies, attendanceRecords, correctionRequests, rewards, attendanceLogs, teamLeaders, teamMembers,
   type Company, type InsertCompany,
   type User, type InsertUser,
   type Task, type InsertTask,
@@ -29,6 +29,8 @@ import {
   type CorrectionRequest, type InsertCorrectionRequest,
   type Reward, type InsertReward,
   type AttendanceLog, type InsertAttendanceLog,
+  type TeamLeader, type InsertTeamLeader,
+  type TeamMember, type InsertTeamMember,
 } from "@shared/schema";
 import { eq, and, or, desc, gte, lte, sql, inArray } from "drizzle-orm";
 
@@ -270,6 +272,23 @@ export interface IStorage {
   
   // NEW ATTENDANCE SYSTEM - Attendance Logs (Audit Trail)
   createAttendanceLog(log: InsertAttendanceLog): Promise<AttendanceLog>;
+  
+  // Team Leader operations
+  createTeamLeader(leader: InsertTeamLeader): Promise<TeamLeader>;
+  getTeamLeaderById(id: number): Promise<TeamLeader | null>;
+  getTeamLeaderByUserId(userId: number): Promise<TeamLeader | null>;
+  getTeamLeaderByTeamId(teamId: string): Promise<TeamLeader | null>;
+  getTeamLeadersByCompanyId(companyId: number): Promise<TeamLeader[]>;
+  updateTeamLeader(id: number, updates: Partial<InsertTeamLeader>): Promise<void>;
+  deleteTeamLeader(id: number): Promise<void>;
+  
+  // Team Member operations
+  listTeamMembers(teamLeaderId: number): Promise<User[]>;
+  listTeamMembersByCompany(companyId: number): Promise<TeamMember[]>;
+  addTeamMember(member: InsertTeamMember): Promise<TeamMember>;
+  removeTeamMember(teamLeaderId: number, userId: number): Promise<void>;
+  isUserInTeam(userId: number): Promise<boolean>;
+  getUnassignedEligibleMembers(companyId: number): Promise<User[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1606,6 +1625,111 @@ export class DbStorage implements IStorage {
     }
     
     return markedCount;
+  }
+  
+  // Team Leader Management
+  async createTeamLeader(leader: InsertTeamLeader): Promise<TeamLeader> {
+    const result = await db.insert(teamLeaders).values(leader).returning();
+    return result[0];
+  }
+  
+  async getTeamLeaderById(id: number): Promise<TeamLeader | null> {
+    const result = await db.select().from(teamLeaders)
+      .where(eq(teamLeaders.id, id))
+      .limit(1);
+    return result[0] || null;
+  }
+  
+  async getTeamLeaderByUserId(userId: number): Promise<TeamLeader | null> {
+    const result = await db.select().from(teamLeaders)
+      .where(eq(teamLeaders.userId, userId))
+      .limit(1);
+    return result[0] || null;
+  }
+  
+  async getTeamLeaderByTeamId(teamId: string): Promise<TeamLeader | null> {
+    const result = await db.select().from(teamLeaders)
+      .where(eq(teamLeaders.teamId, teamId))
+      .limit(1);
+    return result[0] || null;
+  }
+  
+  async getTeamLeadersByCompanyId(companyId: number): Promise<TeamLeader[]> {
+    return await db.select().from(teamLeaders)
+      .where(eq(teamLeaders.companyId, companyId))
+      .orderBy(desc(teamLeaders.createdAt));
+  }
+  
+  async updateTeamLeader(id: number, updates: Partial<InsertTeamLeader>): Promise<void> {
+    await db.update(teamLeaders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(teamLeaders.id, id));
+  }
+  
+  async deleteTeamLeader(id: number): Promise<void> {
+    await db.delete(teamLeaders).where(eq(teamLeaders.id, id));
+  }
+  
+  // Team Member Management
+  async listTeamMembers(teamLeaderId: number): Promise<User[]> {
+    const members = await db.select({
+      user: users,
+    })
+      .from(teamMembers)
+      .innerJoin(users, eq(teamMembers.userId, users.id))
+      .where(eq(teamMembers.teamLeaderId, teamLeaderId));
+    
+    return members.map(m => m.user);
+  }
+  
+  async listTeamMembersByCompany(companyId: number): Promise<TeamMember[]> {
+    return await db.select().from(teamMembers)
+      .where(eq(teamMembers.companyId, companyId));
+  }
+  
+  async addTeamMember(member: InsertTeamMember): Promise<TeamMember> {
+    const result = await db.insert(teamMembers).values(member).returning();
+    return result[0];
+  }
+  
+  async removeTeamMember(teamLeaderId: number, userId: number): Promise<void> {
+    await db.delete(teamMembers)
+      .where(and(
+        eq(teamMembers.teamLeaderId, teamLeaderId),
+        eq(teamMembers.userId, userId)
+      ));
+  }
+  
+  async isUserInTeam(userId: number): Promise<boolean> {
+    const result = await db.select().from(teamMembers)
+      .where(eq(teamMembers.userId, userId))
+      .limit(1);
+    return result.length > 0;
+  }
+  
+  async getUnassignedEligibleMembers(companyId: number): Promise<User[]> {
+    const assignedUserIds = await db.select({ userId: teamMembers.userId })
+      .from(teamMembers)
+      .where(eq(teamMembers.companyId, companyId));
+    
+    const assignedIds = assignedUserIds.map(u => u.userId);
+    
+    if (assignedIds.length === 0) {
+      return await db.select().from(users)
+        .where(and(
+          eq(users.companyId, companyId),
+          eq(users.isActive, true),
+          eq(users.role, 'company_member')
+        ));
+    }
+    
+    return await db.select().from(users)
+      .where(and(
+        eq(users.companyId, companyId),
+        eq(users.isActive, true),
+        eq(users.role, 'company_member'),
+        sql`${users.id} NOT IN (${sql.join(assignedIds.map(id => sql`${id}`), sql`, `)})`
+      ));
   }
 }
 

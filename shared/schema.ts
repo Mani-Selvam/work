@@ -335,6 +335,28 @@ export const attendanceLogs = pgTable("attendance_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const teamLeaders = pgTable("team_leaders", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull().unique(),
+  companyId: integer("company_id").references(() => companies.id).notNull(),
+  teamId: varchar("team_id", { length: 50 }).notNull().unique(),
+  teamName: varchar("team_name", { length: 255 }).notNull(),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const teamMembers = pgTable("team_members", {
+  id: serial("id").primaryKey(),
+  teamLeaderId: integer("team_leader_id").references(() => teamLeaders.id, { onDelete: "cascade" }).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  companyId: integer("company_id").references(() => companies.id).notNull(),
+  assignedBy: integer("assigned_by").references(() => users.id),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueTeamMember: sql`UNIQUE (team_leader_id, user_id)`,
+}));
+
 export const insertCompanySchema = createInsertSchema(companies).omit({
   id: true,
   serverId: true,
@@ -346,6 +368,8 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   uniqueUserId: true,
   createdAt: true,
+}).extend({
+  role: z.enum(['super_admin', 'company_admin', 'company_member', 'team_leader']).optional(),
 });
 
 export const loginSchema = z.object({
@@ -670,3 +694,27 @@ export const insertAttendanceLogSchema = createInsertSchema(attendanceLogs).omit
 
 export type InsertAttendanceLog = z.infer<typeof insertAttendanceLogSchema>;
 export type AttendanceLog = typeof attendanceLogs.$inferSelect;
+
+export const insertTeamLeaderSchema = createInsertSchema(teamLeaders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  teamName: z.string().min(2, "Team name must be at least 2 characters"),
+});
+
+export type InsertTeamLeader = z.infer<typeof insertTeamLeaderSchema>;
+export type TeamLeader = typeof teamLeaders.$inferSelect;
+
+export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
+export type TeamMember = typeof teamMembers.$inferSelect;
+
+export const teamLeaderLoginSchema = z.object({
+  teamId: z.string().min(1, "Team ID is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
