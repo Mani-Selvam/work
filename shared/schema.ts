@@ -357,6 +357,15 @@ export const teamMembers = pgTable("team_members", {
   uniqueTeamMember: sql`UNIQUE (team_leader_id, user_id)`,
 }));
 
+export const teamMessages = pgTable("team_messages", {
+  id: serial("id").primaryKey(),
+  teamId: varchar("team_id", { length: 50 }).notNull(),
+  senderId: integer("sender_id").references(() => users.id).notNull(),
+  message: text("message").notNull(),
+  attachments: text("attachments").array(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertCompanySchema = createInsertSchema(companies).omit({
   id: true,
   serverId: true,
@@ -505,6 +514,11 @@ export const insertGroupMessageSchema = createInsertSchema(groupMessages).omit({
   createdAt: true,
 });
 
+export const insertTeamMessageSchema = createInsertSchema(teamMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertTaskTimeLogSchema = createInsertSchema(taskTimeLogs).omit({
   id: true,
   updatedAt: true,
@@ -569,6 +583,9 @@ export type FileUpload = typeof fileUploads.$inferSelect;
 
 export type InsertGroupMessage = z.infer<typeof insertGroupMessageSchema>;
 export type GroupMessage = typeof groupMessages.$inferSelect;
+
+export type InsertTeamMessage = z.infer<typeof insertTeamMessageSchema>;
+export type TeamMessage = typeof teamMessages.$inferSelect;
 
 export type InsertTaskTimeLog = z.infer<typeof insertTaskTimeLogSchema>;
 export type TaskTimeLog = typeof taskTimeLogs.$inferSelect;

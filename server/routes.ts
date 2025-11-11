@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCompanySchema, insertUserSchema, insertTaskSchema, insertReportSchema, insertMessageSchema, insertRatingSchema, insertFileUploadSchema, insertGroupMessageSchema, insertFeedbackSchema, loginSchema, signupSchema, firebaseSigninSchema, companyRegistrationSchema, companyBasicRegistrationSchema, superAdminLoginSchema, companyAdminLoginSchema, companyUserLoginSchema, insertSlotPricingSchema, insertCompanyPaymentSchema, updatePaymentStatusSchema, slotPurchaseSchema, passwordResetRequestSchema, passwordResetSchema, insertAttendanceRecordSchema, insertCorrectionRequestSchema, insertTeamLeaderSchema, insertTeamMemberSchema, teamLeaderLoginSchema } from "@shared/schema";
+import { insertCompanySchema, insertUserSchema, insertTaskSchema, insertReportSchema, insertMessageSchema, insertRatingSchema, insertFileUploadSchema, insertGroupMessageSchema, insertTeamMessageSchema, insertFeedbackSchema, loginSchema, signupSchema, firebaseSigninSchema, companyRegistrationSchema, companyBasicRegistrationSchema, superAdminLoginSchema, companyAdminLoginSchema, companyUserLoginSchema, insertSlotPricingSchema, insertCompanyPaymentSchema, updatePaymentStatusSchema, slotPurchaseSchema, passwordResetRequestSchema, passwordResetSchema, insertAttendanceRecordSchema, insertCorrectionRequestSchema, insertTeamLeaderSchema, insertTeamMemberSchema, teamLeaderLoginSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { sendReportNotification, sendCompanyServerIdEmail, sendUserIdEmail, sendPasswordResetEmail, sendPaymentConfirmationEmail, sendCompanyVerificationEmail } from "./email";
@@ -1612,45 +1612,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/tasks", async (req, res, next) => {
+  app.get("/api/tasks", loadUserContext, authorizePermissions(["tasks:view:all", "tasks:view:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      if (!requestingUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
+      const requestingUser = req.context.user;
       const { userId, assignedBy } = req.query;
       
+      let tasks: Awaited<ReturnType<typeof storage.getTasksByUserId>> = [];
       if (userId) {
-        const tasks = await storage.getTasksByUserId(parseInt(userId as string));
-        // Filter by company unless super_admin
-        if (requestingUser.role === 'super_admin') {
-          res.json(tasks);
-        } else {
-          res.json(tasks.filter(task => task.companyId === requestingUser.companyId));
-        }
+        tasks = await storage.getTasksByUserId(parseInt(userId as string));
       } else if (assignedBy) {
-        const tasks = await storage.getTasksByAssignedBy(parseInt(assignedBy as string));
-        // Filter by company unless super_admin
-        if (requestingUser.role === 'super_admin') {
-          res.json(tasks);
-        } else {
-          res.json(tasks.filter(task => task.companyId === requestingUser.companyId));
-        }
+        tasks = await storage.getTasksByAssignedBy(parseInt(assignedBy as string));
       } else if (requestingUser.role === 'super_admin') {
-        const tasks = await storage.getAllTasks();
-        res.json(tasks);
+        tasks = await storage.getAllTasks();
       } else if (requestingUser.companyId) {
-        const tasks = await storage.getTasksByCompanyId(requestingUser.companyId);
-        res.json(tasks);
-      } else {
-        res.json([]);
+        tasks = await storage.getTasksByCompanyId(requestingUser.companyId);
       }
+
+      // Apply team scoping for team leaders
+      if (requestingUser.role === 'team_leader' && req.context.teamScope) {
+        const teamMemberIds = req.context.teamScope.memberIds;
+        tasks = tasks.filter(task => 
+          teamMemberIds.includes(task.assignedTo) || 
+          task.assignedTo === requestingUser.id ||
+          (task.assignedBy && teamMemberIds.includes(task.assignedBy)) ||
+          task.assignedBy === requestingUser.id
+        );
+      } else if (requestingUser.role !== 'super_admin' && requestingUser.companyId) {
+        // Filter by company for non-super admins
+        tasks = tasks.filter(task => task.companyId === requestingUser.companyId);
+      }
+
+      res.json(tasks);
     } catch (error) {
       next(error);
     }
@@ -1905,60 +1901,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/reports", async (req, res, next) => {
+  app.get("/api/reports", loadUserContext, authorizePermissions(["reports:view:all", "reports:view:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      if (!requestingUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
+      const requestingUser = req.context.user;
       const { userId, startDate, endDate } = req.query;
       
+      let reports: Awaited<ReturnType<typeof storage.getReportsByUserId>> = [];
       if (userId && startDate && endDate) {
-        const reports = await storage.getReportsByUserAndDate(
+        reports = await storage.getReportsByUserAndDate(
           parseInt(userId as string),
           new Date(startDate as string),
           new Date(endDate as string)
         );
-        // Filter by company unless super_admin
-        if (requestingUser.role === 'super_admin') {
-          res.json(reports);
-        } else {
-          res.json(reports.filter(report => report.companyId === requestingUser.companyId));
-        }
       } else if (userId) {
-        const reports = await storage.getReportsByUserId(parseInt(userId as string));
-        // Filter by company unless super_admin
-        if (requestingUser.role === 'super_admin') {
-          res.json(reports);
-        } else {
-          res.json(reports.filter(report => report.companyId === requestingUser.companyId));
-        }
+        reports = await storage.getReportsByUserId(parseInt(userId as string));
       } else if (startDate && endDate) {
-        const reports = await storage.getReportsByDate(
+        reports = await storage.getReportsByDate(
           new Date(startDate as string),
           new Date(endDate as string)
         );
-        // Filter by company unless super_admin
-        if (requestingUser.role === 'super_admin') {
-          res.json(reports);
-        } else {
-          res.json(reports.filter(report => report.companyId === requestingUser.companyId));
-        }
       } else if (requestingUser.role === 'super_admin') {
-        const reports = await storage.getAllReports();
-        res.json(reports);
+        reports = await storage.getAllReports();
       } else if (requestingUser.companyId) {
-        const reports = await storage.getReportsByCompanyId(requestingUser.companyId);
-        res.json(reports);
-      } else {
-        res.json([]);
+        reports = await storage.getReportsByCompanyId(requestingUser.companyId);
       }
+
+      // Apply team scoping for team leaders
+      if (requestingUser.role === 'team_leader' && req.context.teamScope) {
+        const teamMemberIds = req.context.teamScope.memberIds;
+        reports = reports.filter(report => 
+          teamMemberIds.includes(report.userId) || report.userId === requestingUser.id
+        );
+      } else if (requestingUser.role !== 'super_admin' && requestingUser.companyId) {
+        // Filter by company for non-super admins
+        reports = reports.filter(report => report.companyId === requestingUser.companyId);
+      }
+
+      res.json(reports);
     } catch (error) {
       next(error);
     }
@@ -2022,22 +2005,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Rating routes
-  app.post("/api/ratings", async (req, res, next) => {
+  app.post("/api/ratings", loadUserContext, authorizePermissions(["ratings:give:all", "ratings:give:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
       }
-      
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      
-      if (!requestingUser || (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')) {
-        return res.status(403).json({ message: "Only admins can rate users" });
+
+      const requestingUser = req.context.user;
+      const targetUserId = req.body.userId;
+
+      // Verify target user exists and get their info
+      const targetUser = await storage.getUserById(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "Target user not found" });
+      }
+
+      // Enforce team scoping for team leaders
+      if (requestingUser.role === 'team_leader') {
+        if (!req.context.teamScope) {
+          return res.status(403).json({ message: "Team leader without assigned team" });
+        }
+        const teamMemberIds = req.context.teamScope.memberIds;
+        if (!teamMemberIds.includes(targetUserId)) {
+          return res.status(403).json({ message: "Cannot rate users outside your team" });
+        }
+      } else if (requestingUser.role !== 'super_admin') {
+        // Company admins can only rate users in their company
+        if (targetUser.companyId !== requestingUser.companyId) {
+          return res.status(403).json({ message: "Cannot rate users outside your company" });
+        }
       }
       
       const ratingData = {
-        userId: req.body.userId,
+        userId: targetUserId,
         ratedBy: requestingUser.id,
         rating: req.body.rating,
         feedback: req.body.feedback,
@@ -2060,24 +2060,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/ratings", async (req, res, next) => {
+  app.get("/api/ratings", loadUserContext, authorizePermissions(["ratings:view:all", "ratings:view:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      if (!requestingUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
+      const requestingUser = req.context.user;
       const { userId, latest } = req.query;
       
       if (userId && latest === 'true') {
         const rating = await storage.getLatestRatingByUserId(parseInt(userId as string));
-        // Check if the user belongs to the same company (unless super_admin)
-        if (rating && requestingUser.role !== 'super_admin') {
+        
+        // Check access for team leaders
+        if (rating && requestingUser.role === 'team_leader' && req.context.teamScope) {
+          const teamMemberIds = req.context.teamScope.memberIds;
+          if (!teamMemberIds.includes(rating.userId) && rating.userId !== requestingUser.id) {
+            return res.status(403).json({ message: "Access denied - not in your team" });
+          }
+        } else if (rating && requestingUser.role !== 'super_admin') {
           const ratedUser = await storage.getUserById(rating.userId);
           if (ratedUser && ratedUser.companyId !== requestingUser.companyId) {
             return res.status(403).json({ message: "Access denied" });
@@ -2085,31 +2086,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         res.json(rating);
       } else if (userId) {
-        const ratings = await storage.getRatingsByUserId(parseInt(userId as string));
-        // Filter by company unless super_admin
-        if (requestingUser.role === 'super_admin') {
-          res.json(ratings);
-        } else {
-          // Verify user is in same company
+        let ratings = await storage.getRatingsByUserId(parseInt(userId as string));
+        
+        // Apply team scoping for team leaders
+        if (requestingUser.role === 'team_leader' && req.context.teamScope) {
+          const targetUserId = parseInt(userId as string);
+          const teamMemberIds = req.context.teamScope.memberIds;
+          if (!teamMemberIds.includes(targetUserId) && targetUserId !== requestingUser.id) {
+            return res.status(403).json({ message: "Access denied - not in your team" });
+          }
+        } else if (requestingUser.role !== 'super_admin') {
           const ratedUser = await storage.getUserById(parseInt(userId as string));
-          if (ratedUser && ratedUser.companyId === requestingUser.companyId) {
-            res.json(ratings);
-          } else {
-            res.json([]);
+          if (!ratedUser || ratedUser.companyId !== requestingUser.companyId) {
+            return res.status(403).json({ message: "Access denied" });
           }
         }
-      } else if (requestingUser.role === 'super_admin') {
-        const ratings = await storage.getAllRatings();
         res.json(ratings);
-      } else if (requestingUser.companyId) {
-        // Return ratings for users in the same company
-        const companyUsers = await storage.getUsersByCompanyId(requestingUser.companyId);
-        const companyUserIds = companyUsers.map(u => u.id);
-        const allRatings = await storage.getAllRatings();
-        const companyRatings = allRatings.filter(r => companyUserIds.includes(r.userId));
-        res.json(companyRatings);
       } else {
-        res.json([]);
+        let ratings: Awaited<ReturnType<typeof storage.getAllRatings>> = [];
+        if (requestingUser.role === 'super_admin') {
+          ratings = await storage.getAllRatings();
+        } else if (requestingUser.companyId) {
+          const companyUsers = await storage.getUsersByCompanyId(requestingUser.companyId);
+          const companyUserIds = companyUsers.map(u => u.id);
+          const allRatings = await storage.getAllRatings();
+          ratings = allRatings.filter(r => companyUserIds.includes(r.userId));
+        }
+
+        // Apply team scoping for team leaders
+        if (requestingUser.role === 'team_leader' && req.context.teamScope) {
+          const teamMemberIds = req.context.teamScope.memberIds;
+          ratings = ratings.filter(r => 
+            teamMemberIds.includes(r.userId) || r.userId === requestingUser.id
+          );
+        }
+
+        res.json(ratings);
       }
     } catch (error) {
       next(error);
@@ -2257,6 +2269,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.json([]);
       }
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Team message routes
+  app.post("/api/team-messages", loadUserContext, authorizePermissions(["messages:send:team"]), enforceTeamScope, async (req, res, next) => {
+    try {
+      if (!req.context?.teamScope) {
+        return res.status(403).json({ message: "Team leader without assigned team" });
+      }
+
+      // SECURITY: Force teamId to be the authenticated user's team - never trust client input
+      const messageData = {
+        teamId: req.context.teamScope.teamId,
+        senderId: req.context.user.id,
+        message: req.body.message,
+        attachments: req.body.attachments || null,
+      };
+
+      // Validate that the sender is actually the team leader
+      if (messageData.senderId !== req.context.user.id) {
+        return res.status(403).json({ message: "Cannot send messages as another user" });
+      }
+
+      const validatedMessage = insertTeamMessageSchema.parse(messageData);
+      const message = await storage.createTeamMessage(validatedMessage);
+      res.json(message);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/team-messages", loadUserContext, authorizePermissions(["messages:view:team"]), enforceTeamScope, async (req, res, next) => {
+    try {
+      if (!req.context?.teamScope) {
+        return res.status(403).json({ message: "Team leader without assigned team" });
+      }
+
+      const { limit } = req.query;
+      const teamId = req.context.teamScope.teamId;
+
+      let messages;
+      if (limit) {
+        messages = await storage.getRecentTeamMessages(teamId, parseInt(limit as string));
+      } else {
+        messages = await storage.getTeamMessagesByTeamId(teamId);
+      }
+
+      res.json(messages);
     } catch (error) {
       next(error);
     }

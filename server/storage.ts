@@ -1,6 +1,6 @@
 ﻿import { db } from "./db";
 import { 
-  companies, users, tasks, reports, messages, ratings, fileUploads, archiveReports, groupMessages, taskTimeLogs, feedbacks, slotPricing, companyPayments, passwordResetTokens, adminActivityLogs, badges, autoTasks, leaves, holidays, tasksReports,
+  companies, users, tasks, reports, messages, ratings, fileUploads, archiveReports, groupMessages, teamMessages, taskTimeLogs, feedbacks, slotPricing, companyPayments, passwordResetTokens, adminActivityLogs, badges, autoTasks, leaves, holidays, tasksReports,
   shifts, attendancePolicies, attendanceRecords, correctionRequests, rewards, attendanceLogs, teamLeaders, teamMembers,
   type Company, type InsertCompany,
   type User, type InsertUser,
@@ -11,6 +11,7 @@ import {
   type FileUpload, type InsertFileUpload,
   type ArchiveReport,
   type GroupMessage, type InsertGroupMessage,
+  type TeamMessage, type InsertTeamMessage,
   type TaskTimeLog, type InsertTaskTimeLog,
   type Feedback, type InsertFeedback,
   type SlotPricing, type InsertSlotPricing,
@@ -118,6 +119,11 @@ export interface IStorage {
   getAllGroupMessages(): Promise<GroupMessage[]>;
   getGroupMessagesByCompanyId(companyId: number): Promise<GroupMessage[]>;
   getRecentGroupMessages(limit: number): Promise<GroupMessage[]>;
+  
+  // Team message operations
+  createTeamMessage(message: InsertTeamMessage): Promise<TeamMessage>;
+  getTeamMessagesByTeamId(teamId: string): Promise<TeamMessage[]>;
+  getRecentTeamMessages(teamId: string, limit: number): Promise<TeamMessage[]>;
   
   // Task time log operations
   getTaskTimeLog(taskId: number, userId: number, date: string): Promise<TaskTimeLog | null>;
@@ -748,6 +754,24 @@ export class DbStorage implements IStorage {
   async getRecentGroupMessages(limit: number): Promise<GroupMessage[]> {
     return await db.select().from(groupMessages)
       .orderBy(desc(groupMessages.createdAt))
+      .limit(limit);
+  }
+
+  async createTeamMessage(message: InsertTeamMessage): Promise<TeamMessage> {
+    const result = await db.insert(teamMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getTeamMessagesByTeamId(teamId: string): Promise<TeamMessage[]> {
+    return await db.select().from(teamMessages)
+      .where(eq(teamMessages.teamId, teamId))
+      .orderBy(desc(teamMessages.createdAt));
+  }
+
+  async getRecentTeamMessages(teamId: string, limit: number): Promise<TeamMessage[]> {
+    return await db.select().from(teamMessages)
+      .where(eq(teamMessages.teamId, teamId))
+      .orderBy(desc(teamMessages.createdAt))
       .limit(limit);
   }
 
