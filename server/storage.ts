@@ -289,6 +289,12 @@ export interface IStorage {
   removeTeamMember(teamLeaderId: number, userId: number): Promise<void>;
   isUserInTeam(userId: number): Promise<boolean>;
   getUnassignedEligibleMembers(companyId: number): Promise<User[]>;
+  getTeamLeaderWithMembers(userId: number): Promise<{
+    id: number;
+    teamId: string;
+    teamName: string;
+    memberIds: number[];
+  } | null>;
 }
 
 export class DbStorage implements IStorage {
@@ -1730,6 +1736,30 @@ export class DbStorage implements IStorage {
         eq(users.role, 'company_member'),
         sql`${users.id} NOT IN (${sql.join(assignedIds.map(id => sql`${id}`), sql`, `)})`
       ));
+  }
+  
+  async getTeamLeaderWithMembers(userId: number): Promise<{
+    id: number;
+    teamId: string;
+    teamName: string;
+    memberIds: number[];
+  } | null> {
+    const leader = await this.getTeamLeaderByUserId(userId);
+    
+    if (!leader) {
+      return null;
+    }
+    
+    const members = await db.select({ userId: teamMembers.userId })
+      .from(teamMembers)
+      .where(eq(teamMembers.teamLeaderId, leader.id));
+    
+    return {
+      id: leader.id,
+      teamId: leader.teamId,
+      teamName: leader.teamName,
+      memberIds: members.map(m => m.userId),
+    };
   }
 }
 

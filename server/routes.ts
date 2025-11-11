@@ -9,6 +9,10 @@ import { sendReportNotification, sendCompanyServerIdEmail, sendUserIdEmail, send
 import crypto from "crypto";
 import Stripe from "stripe";
 import passport from "passport";
+import { loadUserContext, requireAuth } from "./middleware/session";
+import { requireAdmin, requireTeamLeaderOrAdmin, authorizePermissions, enforceTeamScope, buildScopedFilters } from "./middleware/authorize";
+import { inArray } from "drizzle-orm";
+import { PERMISSION_MAP, type UserRole } from "@shared/permissions";
 
 const stripe = process.env.STRIPE_SECRET_KEY 
   ? new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -27,44 +31,28 @@ function generateUniqueId(prefix: string): string {
   return `${prefix}-${id}`;
 }
 
-async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const userId = parseInt(req.headers["x-user-id"] as string);
-  if (!userId) {
-    return res.status(401).json({ message: "Authentication required" });
-  }
-  
-  const user = await storage.getUserById(userId);
-  if (!user || !user.isActive) {
-    return res.status(401).json({ message: "User account disabled", code: "USER_INACTIVE" });
-  }
-  
-  next();
-}
-
-async function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const userId = parseInt(req.headers["x-user-id"] as string);
-  if (!userId) {
-    return res.status(401).json({ message: "Authentication required" });
-  }
-  
-  const user = await storage.getUserById(userId);
-  if (!user || !user.isActive) {
-    return res.status(401).json({ message: "User account disabled", code: "USER_INACTIVE" });
-  }
-  
-  if (user.role !== 'company_admin' && user.role !== 'super_admin') {
-    return res.status(403).json({ message: "Admin access required" });
-  }
-  
-  next();
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
   // Config endpoint to check feature availability
   app.get("/api/config", (req, res) => {
     res.json({
       googleOAuthEnabled: isGoogleOAuthConfigured,
       stripeEnabled: !!stripe,
+    });
+  });
+
+  // Get current user permissions
+  app.get("/api/permissions", loadUserContext, async (req, res) => {
+    if (!req.context) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    const userRole = req.context.user.role as UserRole;
+    const permissions = PERMISSION_MAP[userRole] || [];
+
+    res.json({
+      role: req.context.user.role,
+      permissions,
+      teamScope: req.context.teamScope || null,
     });
   });
 
@@ -983,29 +971,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/users", async (req, res, next) => {
+  app.get("/api/users", loadUserContext, authorizePermissions(["users:view:all", "users:view:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = req.headers['x-user-id'];
-      if (!requestingUserId) {
+      if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
-      }
-      
-      const requestingUser = await storage.getUserById(parseInt(requestingUserId as string));
-      if (!requestingUser) {
-        return res.status(404).json({ message: "User not found" });
       }
 
       const { includeDeleted } = req.query;
       let users = await storage.getAllUsers(includeDeleted === 'true');
 
-      // Filter by company unless super_admin
-      if (requestingUser.role === 'super_admin') {
-        // Super admins can see all users
-      } else if (requestingUser.companyId) {
-        // Company admins and members can only see users in their company
-        users = users.filter(u => u.companyId === requestingUser.companyId);
+      const userRole = req.context.user.role;
+
+      if (req.context.isGlobalScope) {
+        // Super admins with global scope can see all users
+      } else if (userRole === 'team_leader' && req.context.teamScope) {
+        // Team leaders can only see users in their team
+        const teamMemberIds = req.context.teamScope.memberIds;
+        users = users.filter(u => 
+          u.companyId === req.context!.companyId && 
+          (teamMemberIds.includes(u.id) || u.id === req.context!.user.id)
+        );
+      } else if (req.context.companyId) {
+        // Company admins and members can see users in their company
+        users = users.filter(u => u.companyId === req.context!.companyId);
       } else {
-        // Users without a company can't see any users
         users = [];
       }
       
@@ -2931,73 +2920,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/leaves/company/:companyId", requireAuth, async (req, res, next) => {
+  app.get("/api/leaves/company/:companyId", loadUserContext, authorizePermissions(["leave:approve:all", "leave:approve:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
-      const requestingUser = await storage.getUserById(requestingUserId);
+      if (!req.context) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
       const companyId = parseInt(req.params.companyId);
       
-      if (!requestingUser || (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')) {
-        return res.status(403).json({ message: "Only admins can view company leave requests" });
-      }
-      
-      if (requestingUser.role === 'company_admin' && requestingUser.companyId !== companyId) {
+      if (req.context.user.role === 'company_admin' && req.context.companyId !== companyId) {
         return res.status(403).json({ message: "You can only view leave requests for your own company" });
       }
       
-      const leaves = await storage.getLeavesByCompanyId(companyId);
+      let leaves = await storage.getLeavesByCompanyId(companyId);
+      
+      // Team leaders can only see leaves for their team members
+      if (req.context.user.role === 'team_leader' && req.context.teamScope) {
+        const teamMemberIds = req.context.teamScope.memberIds;
+        leaves = leaves.filter(leave => teamMemberIds.includes(leave.userId));
+      }
+      
       res.json(leaves);
     } catch (error) {
       next(error);
     }
   });
 
-  app.patch("/api/leaves/:leaveId/approve", requireAuth, async (req, res, next) => {
+  app.patch("/api/leaves/:leaveId/approve", loadUserContext, authorizePermissions(["leave:approve:all", "leave:approve:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
-      const requestingUser = await storage.getUserById(requestingUserId);
-      const leaveId = parseInt(req.params.leaveId);
-      
-      if (!requestingUser || (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')) {
-        return res.status(403).json({ message: "Only admins can approve leave requests" });
+      if (!req.context) {
+        return res.status(401).json({ message: "Authentication required" });
       }
+
+      const leaveId = parseInt(req.params.leaveId);
       
       const leave = await storage.getLeaveById(leaveId);
       if (!leave) {
         return res.status(404).json({ message: "Leave request not found" });
       }
       
-      if (requestingUser.role === 'company_admin' && requestingUser.companyId !== leave.companyId) {
+      if (req.context.user.role === 'company_admin' && req.context.companyId !== leave.companyId) {
         return res.status(403).json({ message: "You can only approve leave requests for your own company" });
       }
       
-      await storage.updateLeaveStatus(leaveId, 'approved', req.body.approvedBy || requestingUserId);
+      // Team leaders can only approve leaves for their team members
+      if (req.context.user.role === 'team_leader') {
+        if (!req.context.teamScope || !req.context.teamScope.memberIds.includes(leave.userId)) {
+          return res.status(403).json({ message: "You can only approve leave requests for your team members" });
+        }
+      }
+      
+      await storage.updateLeaveStatus(leaveId, 'approved', req.body.approvedBy || req.context.user.id);
       res.json({ message: "Leave approved successfully" });
     } catch (error) {
       next(error);
     }
   });
 
-  app.patch("/api/leaves/:leaveId/reject", requireAuth, async (req, res, next) => {
+  app.patch("/api/leaves/:leaveId/reject", loadUserContext, authorizePermissions(["leave:approve:all", "leave:approve:team"]), async (req, res, next) => {
     try {
-      const requestingUserId = parseInt(req.headers["x-user-id"] as string);
-      const requestingUser = await storage.getUserById(requestingUserId);
-      const leaveId = parseInt(req.params.leaveId);
-      
-      if (!requestingUser || (requestingUser.role !== 'company_admin' && requestingUser.role !== 'super_admin')) {
-        return res.status(403).json({ message: "Only admins can reject leave requests" });
+      if (!req.context) {
+        return res.status(401).json({ message: "Authentication required" });
       }
+
+      const leaveId = parseInt(req.params.leaveId);
       
       const leave = await storage.getLeaveById(leaveId);
       if (!leave) {
         return res.status(404).json({ message: "Leave request not found" });
       }
       
-      if (requestingUser.role === 'company_admin' && requestingUser.companyId !== leave.companyId) {
+      if (req.context.user.role === 'company_admin' && req.context.companyId !== leave.companyId) {
         return res.status(403).json({ message: "You can only reject leave requests for your own company" });
       }
       
-      await storage.updateLeaveStatus(leaveId, 'rejected', req.body.rejectedBy || requestingUserId);
+      // Team leaders can only reject leaves for their team members
+      if (req.context.user.role === 'team_leader') {
+        if (!req.context.teamScope || !req.context.teamScope.memberIds.includes(leave.userId)) {
+          return res.status(403).json({ message: "You can only reject leave requests for your team members" });
+        }
+      }
+      
+      await storage.updateLeaveStatus(leaveId, 'rejected', req.body.rejectedBy || req.context.user.id);
       res.json({ message: "Leave rejected successfully" });
     } catch (error) {
       next(error);
