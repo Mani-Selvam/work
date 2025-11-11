@@ -1,0 +1,61 @@
+🧩 ACCESS CONTROL MATRIX (Team Leader Permissions)
+Module	Company Admin	Team Leader	Notes / Restriction
+Dashboard	✅ Full access	✅ Team-level view	Show only team stats (team attendance %, leave requests, etc.)
+Company Profile	✅ Can edit	🚫 No access	Company info should be visible only to admin
+Company Settings	✅ Can edit	🚫 No access	Restricted for security
+Payment History	✅ Full access	🚫 No access	Payments are company-wide, not per team
+Users	✅ Manage all employees	⚠️ Limited: Manage team members only	Can view/add/remove employees within their team only
+Reports	✅ All company reports	✅ Team-only reports	Can view/download team-specific attendance & performance reports
+Tasks	✅ All company tasks	✅ Team tasks only	Can create, assign, and manage tasks for team members
+Messages	✅ Global messaging	✅ Team chat only	Can chat only with their team or company admin
+Ratings	✅ View company-wide ratings	✅ Team member ratings	Can give feedback or ratings to their team employees
+Feedback	✅ Company-wide feedback	✅ Team feedback	Can send feedback to company admin or receive from team
+Leave Approval	✅ All company requests	✅ Team requests only	Can approve/reject leave of employees in their team
+Correction Requests	✅ All company corrections	✅ Team corrections	Can approve attendance correction requests from their team
+Attendance Monitor	✅ All employees	✅ Team employees only	Can view live or historical attendance of their team
+Attendance Reports	✅ All employees	✅ Team employees only	Generate/export reports for team only
+Attendance Policy	✅ Create & Edit	🚫 No access	Controlled by company admin
+Holiday Management	✅ Full control	🚫 View only (optional)	Leader can only view holidays, not edit
+🧠 Simplified Version (Team Leader Access Summary)
+Category	Access Type	Description
+Team Management	✅ Full	Can view/add/remove team members
+Attendance & Leave	✅ Team Only	Approve leave, view attendance, corrections
+Reports	✅ Team Only	View/download reports for team performance
+Communication	✅ Team Only	Messages, feedback, ratings inside team
+Company Control	🚫 None	No access to company-wide settings or payments
+Settings & Policy	🚫 None	Can only view company policies, not edit
+🧭 Example Dashboard View (Team Leader)
+
+When a Team Leader logs in, their sidebar should show only:
+
+🔹 Dashboard Sections
+
+📊 My Team Dashboard
+
+👥 Team Members
+
+🕒 Attendance Monitor (Team)
+
+📝 Leave Requests
+
+🔄 Correction Requests
+
+📁 Team Reports
+
+✅ Tasks (Assign / Track)
+
+💬 Messages (Team Chat)
+
+⭐ Ratings & Feedback
+
+📅 Holiday Calendar (View Only)
+
+🧩 Hidden/Restricted Sections:
+
+Company Profile
+
+Company Settings
+
+Payment History
+
+Attendance Policy
