@@ -18,6 +18,7 @@ import AdminLayout from "@/components/AdminLayout";
 import Overview from "@/pages/user/Overview";
 import Reports from "@/pages/user/Reports";
 import Messages from "@/pages/user/Messages";
+import TeamMessages from "@/pages/user/TeamMessages";
 import Feedback from "@/pages/user/Feedback";
 import Announcements from "@/pages/user/Announcements";
 import Tasks from "@/pages/user/Tasks";
@@ -117,6 +118,9 @@ function Router() {
       </Route>
       <Route path="/user/messages">
         {() => <ProtectedRoute component={() => <UserLayout><Messages /></UserLayout>} allowedRole="user" />}
+      </Route>
+      <Route path="/user/team-messages">
+        {() => <ProtectedRoute component={() => <UserLayout><TeamMessages /></UserLayout>} allowedRole="user" />}
       </Route>
       <Route path="/user/feedback">
         {() => <ProtectedRoute component={() => <UserLayout><Feedback /></UserLayout>} allowedRole="user" />}

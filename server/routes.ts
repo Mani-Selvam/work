@@ -2427,7 +2427,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages = await storage.getTeamMessagesByTeamId(teamId);
       }
 
-      res.json(messages);
+      const messagesWithSender = await Promise.all(
+        messages.map(async (msg) => {
+          const sender = await storage.getUserById(msg.senderId);
+          return { ...msg, sender };
+        })
+      );
+
+      res.json(messagesWithSender);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/team-info", loadUserContext, authorizePermissions(["messages:view:team"]), enforceTeamScope, async (req, res, next) => {
+    try {
+      if (!req.context?.teamScope) {
+        return res.status(403).json({ message: "No team assigned" });
+      }
+
+      const teamLeader = await storage.getTeamLeaderByUserId(req.context.user.id);
+      if (!teamLeader) {
+        return res.status(404).json({ message: "Team leader not found" });
+      }
+
+      const memberUsers = await storage.listTeamMembers(teamLeader.id);
+
+      res.json({
+        teamLeader,
+        members: memberUsers,
+      });
     } catch (error) {
       next(error);
     }

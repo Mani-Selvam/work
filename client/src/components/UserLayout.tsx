@@ -18,7 +18,8 @@ import {
   Calendar,
   Clock,
   History,
-  FileEdit
+  FileEdit,
+  Users
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import BottomNav, { BottomNavItem } from "./BottomNav";
@@ -36,6 +37,7 @@ const allNavItems: NavItem[] = [
   { path: "/user/overview", label: "Overview", icon: LayoutDashboard, requiredPermission: "dashboard:view" },
   { path: "/user/reports", label: "Reports", icon: FileText },
   { path: "/user/messages", label: "Messages", icon: MessageSquare, requiredPermission: "messages:view:team" },
+  { path: "/user/team-messages", label: "Team Messages", icon: Users, requiredPermission: "messages:view:team" },
   { path: "/user/feedback", label: "Feedback", icon: MessageCircle, requiredPermission: "feedback:send" },
   { path: "/user/announcements", label: "Announcements", icon: Megaphone },
   { path: "/user/tasks", label: "Assigned Tasks", icon: ListTodo, requiredPermission: "tasks:view:team" },
