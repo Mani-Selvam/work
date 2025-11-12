@@ -366,6 +366,21 @@ export const teamMessages = pgTable("team_messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const announcements = pgTable("announcements", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").references(() => companies.id).notNull(),
+  createdBy: integer("created_by").references(() => users.id).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  priority: varchar("priority", { length: 20 }).notNull().default("normal"),
+  scope: varchar("scope", { length: 20 }).notNull().default("company"),
+  teamId: varchar("team_id", { length: 50 }),
+  attachments: text("attachments").array(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const insertCompanySchema = createInsertSchema(companies).omit({
   id: true,
   serverId: true,
@@ -519,6 +534,15 @@ export const insertTeamMessageSchema = createInsertSchema(teamMessages).omit({
   createdAt: true,
 });
 
+export const insertAnnouncementSchema = createInsertSchema(announcements).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+  scope: z.enum(['company', 'team']).default('company'),
+});
+
 export const insertTaskTimeLogSchema = createInsertSchema(taskTimeLogs).omit({
   id: true,
   updatedAt: true,
@@ -586,6 +610,9 @@ export type GroupMessage = typeof groupMessages.$inferSelect;
 
 export type InsertTeamMessage = z.infer<typeof insertTeamMessageSchema>;
 export type TeamMessage = typeof teamMessages.$inferSelect;
+
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+export type Announcement = typeof announcements.$inferSelect;
 
 export type InsertTaskTimeLog = z.infer<typeof insertTaskTimeLogSchema>;
 export type TaskTimeLog = typeof taskTimeLogs.$inferSelect;

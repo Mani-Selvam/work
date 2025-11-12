@@ -1,6 +1,6 @@
 ﻿import { db } from "./db";
 import { 
-  companies, users, tasks, reports, messages, ratings, fileUploads, archiveReports, groupMessages, teamMessages, taskTimeLogs, feedbacks, slotPricing, companyPayments, passwordResetTokens, adminActivityLogs, badges, autoTasks, leaves, holidays, tasksReports,
+  companies, users, tasks, reports, messages, ratings, fileUploads, archiveReports, groupMessages, teamMessages, announcements, taskTimeLogs, feedbacks, slotPricing, companyPayments, passwordResetTokens, adminActivityLogs, badges, autoTasks, leaves, holidays, tasksReports,
   shifts, attendancePolicies, attendanceRecords, correctionRequests, rewards, attendanceLogs, teamLeaders, teamMembers,
   type Company, type InsertCompany,
   type User, type InsertUser,
@@ -12,6 +12,7 @@ import {
   type ArchiveReport,
   type GroupMessage, type InsertGroupMessage,
   type TeamMessage, type InsertTeamMessage,
+  type Announcement, type InsertAnnouncement,
   type TaskTimeLog, type InsertTaskTimeLog,
   type Feedback, type InsertFeedback,
   type SlotPricing, type InsertSlotPricing,
@@ -125,6 +126,14 @@ export interface IStorage {
   createTeamMessage(message: InsertTeamMessage): Promise<TeamMessage>;
   getTeamMessagesByTeamId(teamId: string): Promise<TeamMessage[]>;
   getRecentTeamMessages(teamId: string, limit: number): Promise<TeamMessage[]>;
+  
+  // Announcement operations
+  createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement>;
+  getAnnouncementById(id: number): Promise<Announcement | null>;
+  getAnnouncementsByCompanyId(companyId: number): Promise<Announcement[]>;
+  getAnnouncementsByTeamId(teamId: string): Promise<Announcement[]>;
+  updateAnnouncement(id: number, updates: Partial<InsertAnnouncement>): Promise<void>;
+  deleteAnnouncement(id: number): Promise<void>;
   
   // Task time log operations
   getTaskTimeLog(taskId: number, userId: number, date: string): Promise<TaskTimeLog | null>;
@@ -779,6 +788,53 @@ export class DbStorage implements IStorage {
       .where(eq(teamMessages.teamId, teamId))
       .orderBy(desc(teamMessages.createdAt))
       .limit(limit);
+  }
+
+  async createAnnouncement(announcement: InsertAnnouncement): Promise<Announcement> {
+    const result = await db.insert(announcements).values(announcement).returning();
+    return result[0];
+  }
+
+  async getAnnouncementById(id: number): Promise<Announcement | null> {
+    const result = await db.select().from(announcements)
+      .where(eq(announcements.id, id))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  async getAnnouncementsByCompanyId(companyId: number): Promise<Announcement[]> {
+    return await db.select().from(announcements)
+      .where(and(
+        eq(announcements.companyId, companyId),
+        eq(announcements.isActive, true),
+        or(
+          eq(announcements.scope, 'company'),
+          eq(announcements.scope, 'team')
+        )
+      ))
+      .orderBy(desc(announcements.createdAt));
+  }
+
+  async getAnnouncementsByTeamId(teamId: string): Promise<Announcement[]> {
+    return await db.select().from(announcements)
+      .where(and(
+        eq(announcements.teamId, teamId),
+        eq(announcements.isActive, true),
+        eq(announcements.scope, 'team')
+      ))
+      .orderBy(desc(announcements.createdAt));
+  }
+
+  async updateAnnouncement(id: number, updates: Partial<InsertAnnouncement>): Promise<void> {
+    await db.update(announcements)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(announcements.id, id));
+  }
+
+  async deleteAnnouncement(id: number): Promise<void> {
+    await db.update(announcements)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(announcements.id, id));
   }
 
   async getTaskTimeLog(taskId: number, userId: number, date: string): Promise<TaskTimeLog | null> {

@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCompanySchema, insertUserSchema, insertTaskSchema, insertReportSchema, insertMessageSchema, insertRatingSchema, insertFileUploadSchema, insertGroupMessageSchema, insertTeamMessageSchema, insertFeedbackSchema, loginSchema, signupSchema, firebaseSigninSchema, companyRegistrationSchema, companyBasicRegistrationSchema, superAdminLoginSchema, companyAdminLoginSchema, companyUserLoginSchema, insertSlotPricingSchema, insertCompanyPaymentSchema, updatePaymentStatusSchema, slotPurchaseSchema, passwordResetRequestSchema, passwordResetSchema, insertAttendanceRecordSchema, insertCorrectionRequestSchema, insertTeamLeaderSchema, insertTeamMemberSchema, teamLeaderLoginSchema } from "@shared/schema";
+import { insertCompanySchema, insertUserSchema, insertTaskSchema, insertReportSchema, insertMessageSchema, insertRatingSchema, insertFileUploadSchema, insertGroupMessageSchema, insertTeamMessageSchema, insertAnnouncementSchema, insertFeedbackSchema, loginSchema, signupSchema, firebaseSigninSchema, companyRegistrationSchema, companyBasicRegistrationSchema, superAdminLoginSchema, companyAdminLoginSchema, companyUserLoginSchema, insertSlotPricingSchema, insertCompanyPaymentSchema, updatePaymentStatusSchema, slotPurchaseSchema, passwordResetRequestSchema, passwordResetSchema, insertAttendanceRecordSchema, insertCorrectionRequestSchema, insertTeamLeaderSchema, insertTeamMemberSchema, teamLeaderLoginSchema } from "@shared/schema";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { sendReportNotification, sendCompanyServerIdEmail, sendUserIdEmail, sendPasswordResetEmail, sendPaymentConfirmationEmail, sendCompanyVerificationEmail } from "./email";
@@ -1735,7 +1735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/tasks/:id", loadUserContext, authorizePermissions(["tasks:update:all", "tasks:update:team"]), async (req, res, next) => {
+  app.patch("/api/tasks/:id", loadUserContext, authorizePermissions(["tasks:manage:all", "tasks:manage:team"]), async (req, res, next) => {
     try {
       if (!req.context) {
         return res.status(401).json({ message: "Authentication required" });
@@ -2457,6 +2457,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamLeader,
         members: memberUsers,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Announcement routes
+  app.post("/api/announcements", loadUserContext, authorizePermissions(["announcements:create:all", "announcements:create:team"]), async (req, res, next) => {
+    try {
+      if (!req.context) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const userRole = req.context.user.role as UserRole;
+      const requestBody = req.body;
+
+      // Team leaders can only create team-specific announcements
+      if (userRole === 'team_leader') {
+        if (!req.context.teamScope) {
+          return res.status(403).json({ message: "Team leader without assigned team" });
+        }
+        
+        // Force scope to team and set the correct teamId
+        requestBody.scope = 'team';
+        requestBody.teamId = req.context.teamScope.teamId;
+      } else if (userRole === 'company_admin' || userRole === 'super_admin') {
+        // Admins can create company-wide or team-specific announcements
+        if (requestBody.scope === 'team' && !requestBody.teamId) {
+          return res.status(400).json({ message: "Team ID required for team-specific announcements" });
+        }
+      }
+
+      const announcementData = {
+        companyId: req.context.companyId!,
+        createdBy: req.context.user.id,
+        title: requestBody.title,
+        message: requestBody.message,
+        priority: requestBody.priority || 'normal',
+        scope: requestBody.scope || 'company',
+        teamId: requestBody.teamId || null,
+        attachments: requestBody.attachments || null,
+      };
+
+      const validatedAnnouncement = insertAnnouncementSchema.parse(announcementData);
+      const announcement = await storage.createAnnouncement(validatedAnnouncement);
+      res.json(announcement);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
+  app.get("/api/announcements", loadUserContext, authorizePermissions(["announcements:view"]), async (req, res, next) => {
+    try {
+      if (!req.context) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const userRole = req.context.user.role as UserRole;
+      let announcements;
+
+      if (userRole === 'team_leader') {
+        // Team leaders see company-wide announcements + their team-specific announcements
+        if (!req.context.teamScope) {
+          return res.status(403).json({ message: "Team leader without assigned team" });
+        }
+
+        const companyAnnouncements = await storage.getAnnouncementsByCompanyId(req.context.companyId!);
+        const teamAnnouncements = await storage.getAnnouncementsByTeamId(req.context.teamScope.teamId);
+        
+        // Filter to only show company-wide or own team announcements
+        const teamId = req.context.teamScope.teamId;
+        announcements = companyAnnouncements.filter(a => 
+          a.scope === 'company' || a.teamId === teamId
+        );
+      } else if (userRole === 'company_admin' || userRole === 'super_admin') {
+        // Admins see all company announcements
+        announcements = await storage.getAnnouncementsByCompanyId(req.context.companyId!);
+      } else {
+        // Regular members see company-wide announcements only
+        const allAnnouncements = await storage.getAnnouncementsByCompanyId(req.context.companyId!);
+        announcements = allAnnouncements.filter(a => a.scope === 'company');
+      }
+
+      // Add creator info
+      const announcementsWithCreator = await Promise.all(
+        announcements.map(async (announcement) => {
+          const creator = await storage.getUserById(announcement.createdBy);
+          return { ...announcement, creator };
+        })
+      );
+
+      res.json(announcementsWithCreator);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/announcements/:id", loadUserContext, authorizePermissions(["announcements:create:all", "announcements:create:team"]), async (req, res, next) => {
+    try {
+      if (!req.context) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const announcementId = parseInt(req.params.id);
+      const announcement = await storage.getAnnouncementById(announcementId);
+
+      if (!announcement) {
+        return res.status(404).json({ message: "Announcement not found" });
+      }
+
+      // Only creator or admin can update
+      const userRole = req.context.user.role as UserRole;
+      if (userRole === 'team_leader') {
+        if (announcement.createdBy !== req.context.user.id) {
+          return res.status(403).json({ message: "Cannot update announcements created by others" });
+        }
+        if (!req.context.teamScope || announcement.teamId !== req.context.teamScope.teamId) {
+          return res.status(403).json({ message: "Cannot update announcements outside your team" });
+        }
+      } else if (userRole === 'company_admin') {
+        if (announcement.companyId !== req.context.companyId) {
+          return res.status(403).json({ message: "Cannot update announcements from other companies" });
+        }
+      }
+
+      await storage.updateAnnouncement(announcementId, req.body);
+      res.json({ message: "Announcement updated successfully" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/announcements/:id", loadUserContext, authorizePermissions(["announcements:create:all", "announcements:create:team"]), async (req, res, next) => {
+    try {
+      if (!req.context) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const announcementId = parseInt(req.params.id);
+      const announcement = await storage.getAnnouncementById(announcementId);
+
+      if (!announcement) {
+        return res.status(404).json({ message: "Announcement not found" });
+      }
+
+      // Only creator or admin can delete
+      const userRole = req.context.user.role as UserRole;
+      if (userRole === 'team_leader') {
+        if (announcement.createdBy !== req.context.user.id) {
+          return res.status(403).json({ message: "Cannot delete announcements created by others" });
+        }
+        if (!req.context.teamScope || announcement.teamId !== req.context.teamScope.teamId) {
+          return res.status(403).json({ message: "Cannot delete announcements outside your team" });
+        }
+      } else if (userRole === 'company_admin') {
+        if (announcement.companyId !== req.context.companyId) {
+          return res.status(403).json({ message: "Cannot delete announcements from other companies" });
+        }
+      }
+
+      await storage.deleteAnnouncement(announcementId);
+      res.json({ message: "Announcement deleted successfully" });
     } catch (error) {
       next(error);
     }
