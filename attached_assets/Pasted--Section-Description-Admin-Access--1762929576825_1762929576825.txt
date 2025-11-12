@@ -1,0 +1,27 @@
+| Section                     | Description                              | 👑 Admin Access                  | 👨‍🏫 Team Leader Access     |
+| --------------------------- | ---------------------------------------- | -------------------------------- | ---------------------------- |
+| 🏠 **Dashboard / Overview** | Overview of activities                   | Company-wide summary (all teams) | Team summary (own team only) |
+| 🏢 **Company Profile**      | Manage company info, logo, working hours | ✅                                | ❌                            |
+| ⚙️ **Company Settings**     | Company policies, work timings, config   | ✅                                | ❌                            |
+| 💳 **Payment History**      | Subscription and invoice history         | ✅                                | ❌                            |
+| 👥 **Users**                | Manage all employees                     | ✅                                | ❌                            |
+| 👨‍💼 **Team Leaders**      | Manage team leader accounts              | ✅                                | ❌                            |
+| 👨‍👩‍👧‍👦 **Teams**       | Create, edit, delete teams               | ✅                                | View own team members only   |
+| 📊 **Reports**              | Full organization reports                | ✅                                | Team-specific reports only   |
+| 🧾 **Tasks**                | Assign & monitor tasks                   | ✅ (all teams)                    | ✅ (own team only)            |
+| 💬 **Messages**             | Company-wide or private messaging        | ✅                                | ✅ (team scope)               |
+| 💬 **Team Messages**        | Internal team chat                       | View all                         | View own team chat           |
+| ⭐ **Ratings**               | Rate employees’ performance              | ✅ (all)                          | ✅ (team only)                |
+| 💬 **Feedback**             | Collect employee feedback                | ✅ (all)                          | ✅ (from team only)           |
+| 📣 **Announcements**        | Post company-wide notices                | ✅                                | ✅ (team-specific only)       |
+| 🌴 **Leave Approval**       | Approve / Reject leave requests          | ✅ (all employees)                | ✅ (team only)                |
+| 🕐 **Correction Requests**  | Handle attendance correction requests    | ✅ (all)                          | ✅ (team only)                |
+| 👁️ **Attendance Monitor**  | Live attendance view                     | ✅ (company-wide)                 | ✅ (team only)                |
+| 📜 **Attendance Reports**   | Detailed attendance data                 | ✅ (company-wide)                 | ✅ (team only)                |
+| 📋 **Attendance Policy**    | Define attendance rules                  | ✅                                | ❌                            |
+| 🎉 **Holiday Management**   | Manage holidays                          | ✅                                | ❌                            |
+| 📈 **View Reports**         | Personal / team analytics                | ✅ (company view)                 | ✅ (team view)                |
+| 🧍‍♂️ **Assigned Tasks**    | Tasks assigned to self                   | ✅ (own)                          | ✅ (own + can assign to team) |
+| 📬 **Messages / Inbox**     | Receive notifications                    | ✅                                | ✅                            |
+| 📆 **Leave Management**     | Manage / view leave requests             | ✅ (all)                          | ✅ (team only)                |
+| ⏰ **Attendance History**    | Detailed attendance log                  | ✅ (all)                          | ✅ (team only)                |
