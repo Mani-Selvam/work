@@ -46,8 +46,11 @@ export default function PaymentTracking() {
   const { data: payments = [], isLoading, error } = useQuery<CompanyPayment[]>({
     queryKey: ['/api/super-admin/payments', queryParams.toString()],
     queryFn: async () => {
+      const user = localStorage.getItem('user');
+      const userId = user ? JSON.parse(user).id : null;
+      
       const res = await fetch(`/api/super-admin/payments?${queryParams}`, {
-        headers: { 'x-user-id': localStorage.getItem('userId') || '' }
+        headers: { 'x-user-id': userId ? userId.toString() : '' }
       });
       if (!res.ok) {
         throw new Error('Failed to fetch payments');

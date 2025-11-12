@@ -568,7 +568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Team Leader Management Routes
   
   // Create Team Leader (Admin Only)
-  app.post("/api/team-leaders", requireAdmin, async (req, res, next) => {
+  app.post("/api/team-leaders", requireAuth, requireAdmin, async (req, res, next) => {
     try {
       const requestingUserId = parseInt(req.headers["x-user-id"] as string);
       const requestingUser = await storage.getUserById(requestingUserId);
